@@ -47,7 +47,7 @@ We welcome suggestions for enhancements! When suggesting a feature:
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/stalmer1.git
+git clone https://github.com/PlustOrg/stalmer1.git
 cd stalmer1
 
 # Install dependencies

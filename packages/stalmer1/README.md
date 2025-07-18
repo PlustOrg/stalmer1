@@ -1,6 +1,6 @@
 # Stalmer1
 
-[![Tests](https://github.com/yourusername/stalmer1/actions/workflows/test.yml/badge.svg)](https://github.com/yourusername/stalmer1/actions/workflows/test.yml)
+[![Tests](https://github.com/PlustOrg/stalmer1/actions/workflows/test.yml/badge.svg)](https://github.com/PlustOrg/stalmer1/actions/workflows/test.yml)
 [![npm version](https://img.shields.io/npm/v/stalmer1.svg)](https://www.npmjs.com/package/stalmer1)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -92,7 +92,7 @@ Runs tests for the generated application.
 
 ## Documentation
 
-For more detailed documentation, please visit the [official documentation](https://github.com/yourusername/stalmer1/tree/main/docs).
+For more detailed documentation, please visit the [official documentation](https://github.com/PlustOrg/stalmer1/tree/main/docs).
 
 ## License
 
