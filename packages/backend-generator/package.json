@@ -1,0 +1,32 @@
+{
+  "name": "@stalmer1/backend-generator",
+  "version": "0.1.1",
+  "description": "NestJS and Prisma backend generator for Stalmer1",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "test": "jest"
+  },
+  "dependencies": {
+    "ejs": "^3.1.9",
+    "@stalmer1/core": "^0.1.1"
+  },
+  "devDependencies": {
+    "@types/ejs": "^3.1.5",
+    "@types/jest": "^30.0.0",
+    "ts-jest": "^29.4.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "generator",
+    "backend",
+    "nestjs",
+    "prisma",
+    "stalmer1"
+  ],
+  "author": "Stalmer1 Contributors",
+  "license": "MIT"
+}

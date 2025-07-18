@@ -1,0 +1,39 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from './prisma/prisma.service';
+
+@Injectable()
+export class <%= entity.name %>Service {
+  constructor(private prisma: PrismaService) {}
+
+  async findAll(params: any = {}) {
+    return this.prisma.<%= entity.name.toLowerCase() %>.findMany({
+      where: params.filter || {},
+      skip: params.skip,
+      take: params.take,
+      orderBy: params.orderBy,
+    });
+  }
+
+  async findOne(id: string) {
+    return this.prisma.<%= entity.name.toLowerCase() %>.findUnique({
+      where: { id },
+    });
+  }
+
+  async create(data: any) {
+    return this.prisma.<%= entity.name.toLowerCase() %>.create({ data });
+  }
+
+  async update(id: string, data: any) {
+    return this.prisma.<%= entity.name.toLowerCase() %>.update({
+      where: { id },
+      data,
+    });
+  }
+
+  async remove(id: string) {
+    return this.prisma.<%= entity.name.toLowerCase() %>.delete({
+      where: { id },
+    });
+  }
+}

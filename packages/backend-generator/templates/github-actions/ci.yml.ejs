@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [16.x, 18.x]
+<% if (dbType === 'postgresql') { %>
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+<% } %>
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      - run: npm ci
+<% if (hasAuth) { %>
+  <% if (authProvider === 'clerk') { %>
+      - name: Set up Clerk environment
+        run: |
+          echo "CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }}" >> $GITHUB_ENV
+          echo "CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}" >> $GITHUB_ENV
+  <% } else if (authProvider === 'auth0') { %>
+      - name: Set up Auth0 environment
+        run: |
+          echo "AUTH0_DOMAIN=${{ secrets.AUTH0_DOMAIN }}" >> $GITHUB_ENV
+          echo "AUTH0_CLIENT_ID=${{ secrets.AUTH0_CLIENT_ID }}" >> $GITHUB_ENV
+          echo "AUTH0_CLIENT_SECRET=${{ secrets.AUTH0_CLIENT_SECRET }}" >> $GITHUB_ENV
+  <% } %>
+<% } %>
+      - name: Run backend tests
+        run: npm run test:backend
+        env:
+          NODE_ENV: test
+<% if (dbType === 'postgresql') { %>
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test
+<% } %>
+
+      - name: Run frontend tests
+        run: npm run test:frontend
+
+      - name: Run e2e tests
+        run: npm run test:e2e
+
+      - name: Upload coverage reports
+        uses: coverallsapp/github-action@v2
+        if: ${{ matrix.node-version == '18.x' }}

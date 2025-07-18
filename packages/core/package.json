@@ -1,0 +1,27 @@
+{
+  "name": "@stalmer1/core",
+  "version": "0.1.1",
+  "description": "Stalmer1 Core Logic (IR, parser, validation)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "ts-jest": "^29.4.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "parser",
+    "dsl",
+    "validation",
+    "stalmer1"
+  ],
+  "author": "Stalmer1 Contributors",
+  "license": "MIT"
+}

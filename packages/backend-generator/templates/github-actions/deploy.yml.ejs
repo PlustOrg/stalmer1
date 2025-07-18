@@ -1,0 +1,90 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build application
+        run: npm run build
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ secrets.DOCKER_USERNAME }}/<%= appName %>
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=sha,format=long
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+<% if (dbType === 'postgresql') { %>
+      # Example deployment to Kubernetes
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        if: startsWith(github.ref, 'refs/tags/v')
+      
+      - name: Set Kubernetes context
+        uses: azure/k8s-set-context@v3
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+      
+      - name: Deploy to Kubernetes
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          helm upgrade --install <%= appName %> ./helm/<%= appName %> \
+            --set image.repository=${{ secrets.DOCKER_USERNAME }}/<%= appName %> \
+            --set image.tag=${{ steps.meta.outputs.version }} \
+            --set postgresql.auth.password=${{ secrets.DB_PASSWORD }} \
+            --namespace <%= appName %>
+<% } else { %>
+      # Example deployment to simple VPS
+      - name: Deploy to server
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /app/<%= appName %>
+            docker-compose pull
+            docker-compose up -d
+<% } %>

@@ -1,0 +1,40 @@
+{
+  "name": "stalmer1",
+  "version": "0.1.1",
+  "description": "Stalmer1: DSL-driven full-stack web-app generator",
+  "main": "dist/index.js",
+  "bin": {
+    "stalmer1": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "prepare": "npm run build",
+    "build": "tsc",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@stalmer1/cli": "^0.1.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/stalmer1.git"
+  },
+  "keywords": [
+    "code-generator",
+    "dsl",
+    "full-stack",
+    "nestjs",
+    "react",
+    "prisma"
+  ],
+  "author": "Stalmer1 Contributors",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/yourusername/stalmer1/issues"
+  },
+  "homepage": "https://github.com/yourusername/stalmer1#readme"
+}

@@ -1,0 +1,57 @@
+import { Controller, Get, Post, Body, Put, Param, Delete<% if (rbac) { %>, UseGuards<% } %> } from '@nestjs/common';
+<% for (const entity of entities) { %>
+import { <%= entity.name %>Service } from './services/<%= entity.name.toLowerCase() %>.service';
+<% } %>
+
+<% if (rbac) { %>
+import { RolesGuard, Roles } from './rbac.guard';
+<% } %>
+
+<% for (const entity of entities) { %>
+@Controller('<%= entity.name.toLowerCase() %>s')
+<% if (rbac && permissions[entity.name]) { %>@UseGuards(RolesGuard)<% } %>
+export class <%= entity.name %>Controller {
+  constructor(private readonly service: <%= entity.name %>Service) {}
+
+  @Get()
+  <% if (rbac && permissions[entity.name] && permissions[entity.name].find) { %>
+  @Roles(<%= permissions[entity.name].find.map(r => `'${r}'`).join(', ') %>)
+  <% } %>
+  async findAll() {
+    return this.service.findAll();
+  }
+
+  @Get(':id')
+  <% if (rbac && permissions[entity.name] && permissions[entity.name].find) { %>
+  @Roles(<%= permissions[entity.name].find.map(r => `'${r}'`).join(', ') %>)
+  <% } %>
+  async findOne(@Param('id') id: string) {
+    return this.service.findOne(id);
+  }
+
+  @Post()
+  <% if (rbac && permissions[entity.name] && permissions[entity.name].create) { %>
+  @Roles(<%= permissions[entity.name].create.map(r => `'${r}'`).join(', ') %>)
+  <% } %>
+  async create(@Body() data: any) {
+    return this.service.create(data);
+  }
+
+  @Put(':id')
+  <% if (rbac && permissions[entity.name] && permissions[entity.name].create) { %>
+  @Roles(<%= permissions[entity.name].create.map(r => `'${r}'`).join(', ') %>)
+  <% } %>
+  async update(@Param('id') id: string, @Body() data: any) {
+    return this.service.update(id, data);
+  }
+
+  @Delete(':id')
+  <% if (rbac && permissions[entity.name] && permissions[entity.name].create) { %>
+  @Roles(<%= permissions[entity.name].create.map(r => `'${r}'`).join(', ') %>)
+  <% } %>
+  async remove(@Param('id') id: string) {
+    return this.service.remove(id);
+  }
+}
+
+<% } %>

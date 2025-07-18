@@ -1,0 +1,59 @@
+<%_ entities.forEach(entity => { _%>
+import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import { <%= entity.name %>Service } from './<%= entity.name.toLowerCase() %>.service';
+<% if (rbac) { %>import { RolesGuard, Roles } from './rbac.guard';<% } %>
+
+@Controller('<%= entity.name.toLowerCase() %>')
+<% if (rbac) { %>@UseGuards(RolesGuard)<% } %>
+export class <%= entity.name %>Controller {
+  constructor(private readonly service: <%= entity.name %>Service) {}
+
+  @Get()
+  <% if (rbac && permissions[entity.name]?.find) { %>@Roles('<%= permissions[entity.name].find %>')<% } %>
+  findAll() {
+    return this.service.findAll();
+  }
+
+  @Get(':id')
+  <% if (rbac && permissions[entity.name]?.findOne) { %>@Roles('<%= permissions[entity.name].findOne %>')<% } %>
+  findOne(@Param('id') id: string) {
+    return this.service.findOne(id);
+  }
+
+  @Post()
+  <% if (rbac && permissions[entity.name]?.create) { %>@Roles('<%= permissions[entity.name].create %>')<% } %>
+  create(@Body() data: any) {
+    return this.service.create(data);
+  }
+
+  @Put(':id')
+  <% if (rbac && permissions[entity.name]?.update) { %>@Roles('<%= permissions[entity.name].update %>')<% } %>
+  update(@Param('id') id: string, @Body() data: any) {
+    return this.service.update(id, data);
+  }
+
+  @Delete(':id')
+  <% if (rbac && permissions[entity.name]?.remove) { %>@Roles('<%= permissions[entity.name].remove %>')<% } %>
+  remove(@Param('id') id: string) {
+    return this.service.remove(id);
+  }
+}
+<%_ }); _%>
+
+<% if (authProvider === 'jwt') { %>
+// AuthController for login/signup
+import { Controller as AuthController, Post as AuthPost, Body as AuthBody } from '@nestjs/common';
+@AuthController('auth')
+export class AuthController {
+  @AuthPost('login')
+  login(@AuthBody() credentials: any) {
+    // TODO: Implement JWT login logic
+    return { token: 'jwt-token' };
+  }
+  @AuthPost('signup')
+  signup(@AuthBody() data: any) {
+    // TODO: Implement signup logic
+    return { user: data };
+  }
+}
+<% } %>

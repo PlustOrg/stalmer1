@@ -1,0 +1,28 @@
+# Node
+node_modules/
+dist/
+.env
+*.log
+
+# TypeScript
+*.tsbuildinfo
+
+# VSCode
+.vscode/
+
+# Jest
+coverage/
+
+# OS
+.DS_Store
+
+# Build Artifacts
+*.tgz
+
+# Misc
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Generated
+packages/*/dist/

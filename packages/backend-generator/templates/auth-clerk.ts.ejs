@@ -1,0 +1,64 @@
+import { Injectable } from '@nestjs/common';
+import { Clerk } from '@clerk/clerk-sdk-node';
+import { JwtService } from '@nestjs/jwt';
+
+@Injectable()
+export class ClerkAuthService {
+  private readonly clerk: any;
+
+  constructor(private readonly jwtService: JwtService) {
+    // Initialize Clerk SDK
+    this.clerk = Clerk({ apiKey: process.env.CLERK_SECRET_KEY });
+  }
+
+  /**
+   * Validates a Clerk JWT token
+   * @param token - The JWT token to validate
+   * @returns The decoded user data if token is valid, null otherwise
+   */
+  async validateToken(token: string): Promise<any> {
+    try {
+      // Clerk's SDK automatically verifies the token
+      const jwtPayload = await this.clerk.verifyToken(token);
+      
+      if (!jwtPayload) {
+        return null;
+      }
+      
+      // Extract user information from the payload
+      const { sub, email, name } = jwtPayload;
+      
+      // Return user data
+      return { 
+        id: sub,
+        email,
+        name,
+        roles: jwtPayload.roles || []
+      };
+    } catch (error) {
+      console.error('Error validating Clerk token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Gets user data from Clerk by ID
+   * @param userId - The Clerk user ID
+   * @returns User data if found, null otherwise
+   */
+  async getUserById(userId: string): Promise<any> {
+    try {
+      const user = await this.clerk.users.getUser(userId);
+      return {
+        id: user.id,
+        email: user.emailAddresses[0]?.emailAddress,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        // Map other properties as needed
+      };
+    } catch (error) {
+      console.error('Error fetching user from Clerk:', error);
+      return null;
+    }
+  }
+}

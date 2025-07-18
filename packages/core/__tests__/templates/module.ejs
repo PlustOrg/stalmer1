@@ -1,0 +1,19 @@
+import { Module } from '@nestjs/common';
+import { PrismaModule } from './prisma/prisma.module';
+<% entities.forEach(function(entity) { %>
+import { <%= entity.name %>Service } from './services';
+import { <%= entity.name %>Controller } from './controllers';
+<% }); %>
+
+@Module({
+  imports: [PrismaModule],
+  controllers: [
+    <% entities.forEach(function(entity, i) { %><%= entity.name %>Controller<%= i < entities.length - 1 ? ',' : '' %>
+    <% }); %>
+  ],
+  providers: [
+    <% entities.forEach(function(entity, i) { %><%= entity.name %>Service<%= i < entities.length - 1 ? ',' : '' %>
+    <% }); %>
+  ],
+})
+export class AppModule {}

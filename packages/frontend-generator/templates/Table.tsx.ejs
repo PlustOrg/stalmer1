@@ -1,0 +1,1 @@
+<%- pages.map(page => `import React, { useEffect, useState } from 'react';\n\nexport function ${page.name}Table() {\n  const [data, setData] = useState([]);\n  useEffect(() => {\n    fetch('/api/${page.entity.toLowerCase()}')\n      .then(res => res.json())\n      .then(setData);\n  }, []);\n  return <div>${page.entity} Table: {JSON.stringify(data)}</div>;\n}`) .join('\n\n') %>

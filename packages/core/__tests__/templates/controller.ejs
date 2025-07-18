@@ -1,0 +1,49 @@
+import * as express from 'express';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query } from '@nestjs/common';
+<% if (rbac) { %>import { Roles } from './rbac.guard';<% } %>
+import { <%= entity.name %>Service } from './services';
+
+@Controller('<%= entity.name.toLowerCase() %>s')
+export class <%= entity.name %>Controller {
+  constructor(private readonly service: <%= entity.name %>Service) {}
+  
+  @Get()
+  <% if (rbac && permissions[entity.name]?.find) { %>
+  @Roles(<%= JSON.stringify(permissions[entity.name].find) %>)
+  <% } %>
+  async findAll(@Query() query: any) {
+    return this.service.findAll(query);
+  }
+  
+  @Get(':id')
+  <% if (rbac && permissions[entity.name]?.find) { %>
+  @Roles(<%= JSON.stringify(permissions[entity.name].find) %>)
+  <% } %>
+  async findOne(@Param('id') id: string) {
+    return this.service.findOne(id);
+  }
+  
+  @Post()
+  <% if (rbac && permissions[entity.name]?.create) { %>
+  @Roles(<%= JSON.stringify(permissions[entity.name].create) %>)
+  <% } %>
+  async create(@Body() data: any) {
+    return this.service.create(data);
+  }
+  
+  @Put(':id')
+  <% if (rbac && permissions[entity.name]?.update) { %>
+  @Roles(<%= JSON.stringify(permissions[entity.name].update) %>)
+  <% } %>
+  async update(@Param('id') id: string, @Body() data: any) {
+    return this.service.update(id, data);
+  }
+  
+  @Delete(':id')
+  <% if (rbac && permissions[entity.name]?.delete) { %>
+  @Roles(<%= JSON.stringify(permissions[entity.name].delete) %>)
+  <% } %>
+  async remove(@Param('id') id: string) {
+    return this.service.remove(id);
+  }
+}

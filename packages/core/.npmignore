@@ -1,0 +1,16 @@
+# Source files
+src/
+__tests__/
+tsconfig.json
+tsconfig.tsbuildinfo
+jest.config.js
+
+# Editor configs
+.vscode/
+.idea/
+.editorconfig
+
+# Misc
+*.log
+*.tgz
+.DS_Store

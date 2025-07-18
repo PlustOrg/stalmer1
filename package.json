@@ -1,0 +1,57 @@
+{
+  "name": "stalmer1",
+  "version": "0.1.1",
+  "description": "Stalmer1: DSL-driven full-stack web-app generator.",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "lint": "eslint . --ext .ts,.js",
+    "format": "prettier --write .",
+    "test": "jest",
+    "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo",
+    "build": "npm run clean && npm run build:all",
+    "build:all": "tsc -b packages/core packages/backend-generator packages/frontend-generator packages/cli packages/stalmer1",
+    "prepare": "npm run build",
+    "release": "node scripts/release.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/stalmer1.git"
+  },
+  "keywords": [
+    "code-generator",
+    "dsl",
+    "full-stack",
+    "nestjs",
+    "react",
+    "prisma",
+    "database",
+    "authentication",
+    "web-app",
+    "generator",
+    "llm",
+    "stalmer1"
+  ],
+  "author": "Stalmer1 Contributors",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/yourusername/stalmer1/issues"
+  },
+  "homepage": "https://github.com/yourusername/stalmer1#readme",
+  "devDependencies": {
+    "@types/ejs": "^3.1.5",
+    "@types/jest": "^30.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.8.3",
+    "semver": "^7.5.4"
+  },
+  "dependencies": {
+    "commander": "^14.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

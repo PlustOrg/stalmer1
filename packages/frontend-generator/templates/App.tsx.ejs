@@ -1,0 +1,35 @@
+import React from 'react';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { Table } from './Table';
+import { Form } from './Form';
+import { Details } from './Details';
+<% if (authProvider === 'clerk') { %>
+// Clerk integration: see ClerkIntegration.tsx for provider setup
+<% } else if (authProvider === 'auth0') { %>
+// Auth0 integration: see Auth0Integration.tsx for provider setup
+<% } %>
+<% if (sentryDsn) { %>
+// Sentry integration: see sentry.ts for initialization
+<% } %>
+const pages = [
+  { route: '/table', type: 'table' },
+  { route: '/form', type: 'form' },
+  { route: '/details', type: 'details' },
+];
+
+export function App() {
+  return (
+    <Router>
+      <Routes>
+        {/* Generated routes for each page */}
+        {pages.map((page: any) => (
+          <Route key={page.route} path={page.route} element={
+            page.type === 'table' ? <Table /> :
+            page.type === 'form' ? <Form /> :
+            page.type === 'details' ? <Details /> : null
+          } />
+        ))}
+      </Routes>
+    </Router>
+  );
+}

@@ -1,0 +1,141 @@
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../prisma/prisma.service';
+import * as bcrypt from 'bcrypt';
+
+@Injectable()
+export class JwtAuthService {
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService
+  ) {}
+
+  /**
+   * Validates user credentials
+   * @param email - The user's email
+   * @param password - The user's password
+   * @returns The user if validation is successful
+   * @throws UnauthorizedException if validation fails
+   */
+  async validateUser(email: string, password: string): Promise<any> {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+    
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _, ...result } = user;
+    return result;
+  }
+
+  /**
+   * Logs in a user and returns access and refresh tokens
+   * @param user - The user to log in
+   * @returns Object containing access token and refresh token
+   */
+  async login(user: any) {
+    const payload = { sub: user.id, email: user.email, roles: user.roles || [] };
+    
+    return {
+      accessToken: this.jwtService.sign(payload),
+      refreshToken: this.jwtService.sign(payload, { expiresIn: '7d' }),
+    };
+  }
+
+  /**
+   * Registers a new user
+   * @param userData - The user data for registration
+   * @returns The created user
+   */
+  async register(userData: { email: string; password: string; firstName?: string; lastName?: string }) {
+    const { email, password, firstName, lastName } = userData;
+    
+    // Check if user already exists
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+    });
+    
+    if (existingUser) {
+      throw new UnauthorizedException('User with this email already exists');
+    }
+    
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Create the user
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        firstName,
+        lastName,
+        roles: ['USER'], // Default role
+      },
+    });
+    
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _, ...result } = user;
+    return result;
+  }
+
+  /**
+   * Refreshes an access token using a refresh token
+   * @param refreshToken - The refresh token
+   * @returns A new access token
+   * @throws UnauthorizedException if the refresh token is invalid
+   */
+  async refreshAccessToken(refreshToken: string) {
+    try {
+      const decoded = this.jwtService.verify(refreshToken);
+      const user = await this.prisma.user.findUnique({
+        where: { id: decoded.sub },
+      });
+      
+      if (!user) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+      
+      const payload = { sub: user.id, email: user.email, roles: user.roles || [] };
+      
+      return {
+        accessToken: this.jwtService.sign(payload),
+      };
+    } catch (error) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+  }
+
+  /**
+   * Validates a JWT token
+   * @param token - The JWT token to validate
+   * @returns The decoded user data if token is valid, null otherwise
+   */
+  async validateToken(token: string): Promise<any> {
+    try {
+      const decoded = this.jwtService.verify(token.replace('Bearer ', ''));
+      
+      const user = await this.prisma.user.findUnique({
+        where: { id: decoded.sub },
+      });
+      
+      if (!user) {
+        return null;
+      }
+      
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, ...result } = user;
+      return { ...result, roles: decoded.roles };
+    } catch (error) {
+      return null;
+    }
+  }
+}

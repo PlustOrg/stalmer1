@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "build": "tsc -b packages/*",
+    "build:core": "tsc -b packages/core",
+    "build:backend": "tsc -b packages/backend-generator",
+    "build:frontend": "tsc -b packages/frontend-generator",
+    "build:cli": "tsc -b packages/cli"
+  }
+}

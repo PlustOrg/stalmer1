@@ -1,0 +1,45 @@
+version: '3.8'
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - '4000:4000'
+    environment:
+      <% if (db === 'postgresql') { %>
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
+      <% } else { %>
+      - DATABASE_URL=file:./prisma/dev.db
+      <% } %>
+    volumes:
+      - ./backend/prisma:/app/prisma
+    <% if (db === 'postgresql') { %>
+    depends_on:
+      - postgres
+    <% } %>
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - '3000:3000'
+    depends_on:
+      - backend
+  <% if (db === 'postgresql') { %>
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  <% } %>
+
+volumes:
+  postgres_data:
+    <% if (db !== 'postgresql') { %># Not used for sqlite<% } %>

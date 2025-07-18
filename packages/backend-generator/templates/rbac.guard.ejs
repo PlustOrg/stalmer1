@@ -1,0 +1,72 @@
+import { CanActivate, ExecutionContext, Injectable, SetMetadata, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+<% if (authProvider === 'clerk') { %>
+import { ClerkAuthService } from './auth.clerk';
+<% } else if (authProvider === 'auth0') { %>
+import { Auth0Service } from './auth.auth0';
+<% } else { %>
+import { JwtAuthService } from './auth.jwt';
+<% } %>
+
+export const Roles = (...roles: string[]) => SetMetadata('roles', roles);
+
+@Injectable()
+export class RolesGuard implements CanActivate {
+  constructor(
+    private reflector: Reflector,
+<% if (authProvider === 'clerk') { %>
+    private authService: ClerkAuthService
+<% } else if (authProvider === 'auth0') { %>
+    private authService: Auth0Service
+<% } else { %>
+    private authService: JwtAuthService
+<% } %>
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const requiredRoles = this.reflector.get<string[]>('roles', context.getHandler());
+    
+    // If no roles are required, allow access
+    if (!requiredRoles || requiredRoles.length === 0) {
+      return true;
+    }
+    
+    const request = context.switchToHttp().getRequest();
+    const token = request.headers.authorization;
+    
+    if (!token) {
+      throw new UnauthorizedException('No authorization token provided');
+    }
+    
+    // Validate token and get user data
+    const user = await this.authService.validateToken(token);
+    
+    if (!user) {
+      throw new UnauthorizedException('Invalid authorization token');
+    }
+    
+    // Store user data in request for controllers
+    request.user = user;
+    
+    // Check if user has required roles
+    const hasRequiredRole = this.hasRequiredRole(user, requiredRoles);
+    
+    if (!hasRequiredRole) {
+      throw new ForbiddenException(
+        `Access denied. Required roles: ${requiredRoles.join(', ')}`
+      );
+    }
+    
+    return true;
+  }
+  
+  private hasRequiredRole(user: any, requiredRoles: string[]): boolean {
+    // User has no roles
+    if (!user.roles || !Array.isArray(user.roles) || user.roles.length === 0) {
+      return false;
+    }
+    
+    // Check if user has at least one of the required roles
+    return requiredRoles.some(role => user.roles.includes(role));
+  }
+}

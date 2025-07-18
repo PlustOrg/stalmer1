@@ -1,0 +1,82 @@
+import { Injectable } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as jwt from 'jsonwebtoken';
+import { PrismaService } from '../prisma/prisma.service';
+
+@Injectable()
+export class Auth0Service {
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService
+  ) {}
+
+  /**
+   * Validates an Auth0 JWT token
+   * @param token - The JWT token to validate
+   * @returns The decoded user data if token is valid, null otherwise
+   */
+  async validateToken(token: string): Promise<any> {
+    try {
+      // Get the Auth0 public key for verification
+      const jwksUri = `https://${process.env.AUTH0_DOMAIN}/.well-known/jwks.json`;
+      
+      // For production, implement JWKS client to fetch the signing key
+      // This is a simplified example
+      const options = {
+        audience: process.env.AUTH0_AUDIENCE,
+        issuer: `https://${process.env.AUTH0_DOMAIN}/`,
+        algorithms: ['RS256']
+      };
+      
+      // Verify the token
+      const decoded = jwt.verify(token.replace('Bearer ', ''), 
+        // In a real implementation, get the key from JWKS
+        'public_key_from_jwks',
+        options
+      );
+      
+      if (!decoded) {
+        return null;
+      }
+      
+      // Find or create user in your database
+      const user = await this.findOrCreateUser(decoded.sub, decoded);
+      
+      return user;
+    } catch (error) {
+      console.error('Error validating Auth0 token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Find a user by Auth0 ID or create if not exists
+   * @param auth0Id - The Auth0 user ID
+   * @param userData - The user data from Auth0
+   * @returns The user record
+   */
+  private async findOrCreateUser(auth0Id: string, userData: any): Promise<any> {
+    // Look for user with this Auth0 ID
+    let user = await this.prisma.user.findFirst({
+      where: { auth0Id }
+    });
+    
+    if (!user) {
+      // Create a new user if not found
+      user = await this.prisma.user.create({
+        data: {
+          auth0Id,
+          email: userData.email,
+          firstName: userData.given_name || '',
+          lastName: userData.family_name || '',
+          // Map other properties from Auth0 as needed
+        }
+      });
+    }
+    
+    return {
+      ...user,
+      roles: userData[`${process.env.AUTH0_AUDIENCE}/roles`] || []
+    };
+  }
+}
