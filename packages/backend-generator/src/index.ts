@@ -51,7 +51,7 @@ export async function generateBackend(app: IApp, outDir: string) {
   fs.writeFileSync(path.join(outDir, 'prisma/schema.prisma'), prismaSchema);
 
   // Generate NestJS modules, controllers, services
-  const templatesDir = path.join(__dirname, 'templates');
+  const templatesDir = path.join(__dirname, '..', 'templates');
   const entities = app.entities;
   const authProvider = app.config?.auth?.provider;
   const sentryDsn = app.config?.integrations?.monitoring?.dsn;

@@ -63,6 +63,7 @@ export interface IRConfig {
     userEntity?: string;
     roles?: string; // Reference to an enum
     guards?: Record<string, string[]>;
+    props?: Record<string, string | number | boolean | null>; // Additional auth properties like apiKeys, domains, etc.
   };
   integrations?: {
     email?: {

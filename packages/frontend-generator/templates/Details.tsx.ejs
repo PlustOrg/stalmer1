@@ -1,1 +1,115 @@
-<%- pages.map(page => `import React, { useEffect, useState } from 'react';\n\nexport function ${page.name}Details({ id }: { id: string }) {\n  const [data, setData] = useState(null);\n  useEffect(() => {\n    fetch(\`/api/${page.entity.toLowerCase()}/\${id}\`)\n      .then(res => res.json())\n      .then(setData);\n  }, [id]);\n  return <div>${page.entity} Details: {JSON.stringify(data)}</div>;\n}`) .join('\n\n') %>
+<%- pages.filter(page => page.type === 'details').map(page => {
+  const entityName = page.entity || 'Item';
+  const endpoint = page.entity ? page.entity.toLowerCase() + 's' : 'items';
+  
+  return `import React, { useEffect, useState } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import api from '../api';
+
+interface ${entityName} {
+  id: string;
+${page.props?.fields?.map(field => `  ${field.name}: ${field.type || 'any'};`).join('\n') || '  // Define entity fields here based on your model'}
+}
+
+export function ${page.name}Details() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const id = queryParams.get('id');
+
+  const [data, setData] = useState<${entityName} | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) {
+      setError('No ID provided');
+      setLoading(false);
+      return;
+    }
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const response = await api.get<${entityName}>(\`/api/${endpoint}/\${id}\`);
+        setData(response.data);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError('Failed to load data. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [id]);
+
+  const handleDelete = async () => {
+    if (!id) return;
+    
+    if (window.confirm('Are you sure you want to delete this item?')) {
+      try {
+        await api.delete(\`/api/${endpoint}/\${id}\`);
+        navigate('${page.route.replace('details', 'list')}');
+      } catch (err) {
+        console.error('Error deleting item:', err);
+        setError('Failed to delete item. Please try again.');
+      }
+    }
+  };
+
+  if (loading) {
+    return <div className="loading">Loading...</div>;
+  }
+
+  if (error) {
+    return <div className="error">{error}</div>;
+  }
+
+  if (!data) {
+    return <div className="not-found">Item not found</div>;
+  }
+
+  return (
+    <div>
+      <div className="main-header">
+        <h1 className="page-title">${entityName} Details</h1>
+        <div className="actions">
+          <Link to={\`${page.route.replace('details', 'edit')}?id=\${id}\`}>
+            <button className="secondary">Edit</button>
+          </Link>
+          <button className="danger" onClick={handleDelete}>
+            Delete
+          </button>
+          <button className="secondary" onClick={() => navigate('${page.route.replace('details', 'list')}')}>
+            Back to List
+          </button>
+        </div>
+      </div>
+
+      <div className="card">
+        ${page.props?.fields?.map(field => `<div className="detail-row">
+          <div className="detail-label">${field.label || field.name}</div>
+          <div className="detail-value">{data.${field.name}${field.type === 'date' || field.type === 'datetime' ? ' ? new Date(data.' + field.name + ').toLocaleString() : ""'}}</div>
+        </div>`).join('\n        ') || `<div className="detail-row">
+          <div className="detail-label">ID</div>
+          <div className="detail-value">{data.id}</div>
+        </div>
+        
+        {Object.entries(data).map(([key, value]) => {
+          if (key === 'id') return null;
+          return (
+            <div className="detail-row" key={key}>
+              <div className="detail-label">{key}</div>
+              <div className="detail-value">
+                {typeof value === 'object' ? JSON.stringify(value) : value?.toString()}
+              </div>
+            </div>
+          );
+        })}`}
+      </div>
+    </div>
+  );
+}`;
+}).join('\n\n') %}

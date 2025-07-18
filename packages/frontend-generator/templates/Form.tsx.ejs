@@ -1,1 +1,185 @@
-<%- pages.map(page => `import React, { useState } from 'react';\n\nexport function ${page.name}Form() {\n  const [form, setForm] = useState({});\n  const handleChange = (e: any) => setForm({ ...form, [e.target.name]: e.target.value });\n  const handleSubmit = (e: any) => {\n    e.preventDefault();\n    fetch('/api/${page.entity.toLowerCase()}', {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify(form)\n    });\n  };\n  return <form onSubmit={handleSubmit}>\n    {/* TODO: Render fields */}\n    <button type='submit'>Submit</button>\n  </form>;\n}`) .join('\n\n') %>
+<%- pages.filter(page => page.type === 'form').map(page => {
+  const entityName = page.entity || 'Item';
+  const endpoint = page.entity ? page.entity.toLowerCase() + 's' : 'items';
+  
+  return `import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import api from '../api';
+
+interface ${entityName}FormData {
+${page.props?.fields?.map(field => `  ${field.name}: ${field.type || 'string'};`).join('\n') || '  // Define form fields here based on your entity\n  [key: string]: any;'}
+}
+
+export function ${page.name}Form() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const id = queryParams.get('id');
+  const isEditMode = !!id;
+
+  const [formData, setFormData] = useState<${entityName}FormData>({
+    ${page.props?.fields?.map(field => `${field.name}: ${field.defaultValue || '""'}`).join(',\n    ') || '// Initialize form fields'}
+  });
+  const [loading, setLoading] = useState(isEditMode);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // If in edit mode, fetch the existing data
+    if (isEditMode) {
+      const fetchData = async () => {
+        try {
+          setLoading(true);
+          const response = await api.get(\`/api/${endpoint}/\${id}\`);
+          setFormData(response.data);
+          setError(null);
+        } catch (err) {
+          console.error('Error fetching item:', err);
+          setError('Failed to load data. Please try again.');
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchData();
+    }
+  }, [id, isEditMode]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    const fieldValue = (e.target as HTMLInputElement).type === 'checkbox' 
+      ? (e.target as HTMLInputElement).checked 
+      : value;
+      
+    setFormData({
+      ...formData,
+      [name]: fieldValue,
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      if (isEditMode) {
+        // Update existing item
+        await api.put(\`/api/${endpoint}/\${id}\`, formData);
+      } else {
+        // Create new item
+        await api.post(\`/api/${endpoint}\`, formData);
+      }
+      navigate('${page.route.replace('new', 'list').replace('form', 'list')}');
+    } catch (err) {
+      console.error('Error saving data:', err);
+      setError('Failed to save data. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="loading">Loading...</div>;
+  }
+
+  return (
+    <div>
+      <div className="main-header">
+        <h1 className="page-title">{isEditMode ? 'Edit' : 'Create'} ${entityName}</h1>
+      </div>
+
+      {error && <div className="error-message">{error}</div>}
+
+      <form onSubmit={handleSubmit}>
+        ${page.props?.fields?.map(field => {
+          if (field.type === 'boolean') {
+            return `<div className="form-group checkbox">
+          <input
+            type="checkbox"
+            id="${field.name}"
+            name="${field.name}"
+            checked={!!formData.${field.name}}
+            onChange={handleChange}
+          />
+          <label htmlFor="${field.name}">${field.label || field.name}</label>
+        </div>`;
+          } else if (field.type === 'enum' && field.options) {
+            return `<div className="form-group">
+          <label htmlFor="${field.name}">${field.label || field.name}</label>
+          <select
+            id="${field.name}"
+            name="${field.name}"
+            value={formData.${field.name} || ''}
+            onChange={handleChange}
+            required={${field.required ? 'true' : 'false'}}
+          >
+            <option value="">Select...</option>
+            ${field.options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('\n            ')}
+          </select>
+        </div>`;
+          } else if (field.type === 'text' || field.isLongText) {
+            return `<div className="form-group">
+          <label htmlFor="${field.name}">${field.label || field.name}</label>
+          <textarea
+            id="${field.name}"
+            name="${field.name}"
+            value={formData.${field.name} || ''}
+            onChange={handleChange}
+            required={${field.required ? 'true' : 'false'}}
+            rows={5}
+          />
+        </div>`;
+          } else {
+            // Default to text input
+            return `<div className="form-group">
+          <label htmlFor="${field.name}">${field.label || field.name}</label>
+          <input
+            type="${field.inputType || 'text'}"
+            id="${field.name}"
+            name="${field.name}"
+            value={formData.${field.name} || ''}
+            onChange={handleChange}
+            required={${field.required ? 'true' : 'false'}}
+          />
+        </div>`;
+          }
+        }).join('\n        ') || `<div className="form-group">
+          <label htmlFor="name">Name</label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            value={formData.name || ''}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="description">Description</label>
+          <textarea
+            id="description"
+            name="description"
+            value={formData.description || ''}
+            onChange={handleChange}
+            rows={3}
+          />
+        </div>`}
+
+        <div className="form-actions">
+          <button type="submit" disabled={submitting}>
+            {submitting ? 'Saving...' : (isEditMode ? 'Update' : 'Create')}
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('${page.route.replace('new', 'list').replace('form', 'list')}')}
+            className="secondary"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}`;
+}).join('\n\n') %}

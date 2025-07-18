@@ -1,0 +1,43 @@
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+<% if (authProvider === 'clerk') { %>
+import { ClerkProvider } from '@clerk/clerk-react';
+<% } else if (authProvider === 'auth0') { %>
+import { Auth0Provider } from '@auth0/auth0-react';
+<% } %>
+<% if (sentryDsn) { %>
+import * as Sentry from '@sentry/react';
+<% } %>
+import { App } from './App';
+import './styles/index.css';
+
+<% if (sentryDsn) { %>
+// Initialize Sentry
+Sentry.init({
+  dsn: "<%= sentryDsn %>",
+  integrations: [new Sentry.BrowserTracing(), new Sentry.Replay()],
+  tracesSampleRate: 1.0,
+});
+<% } %>
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+<% if (authProvider === 'clerk') { %>
+    <ClerkProvider publishableKey="<%= clerkPublishableKey || 'pk_placeholder' %>">
+      <App />
+    </ClerkProvider>
+<% } else if (authProvider === 'auth0') { %>
+    <Auth0Provider
+      domain="<%= auth0Domain || 'your-domain.auth0.com' %>"
+      clientId="<%= auth0ClientId || 'your-client-id' %>"
+      authorizationParams={{
+        redirect_uri: window.location.origin
+      }}
+    >
+      <App />
+    </Auth0Provider>
+<% } else { %>
+    <App />
+<% } %>
+  </React.StrictMode>,
+);
