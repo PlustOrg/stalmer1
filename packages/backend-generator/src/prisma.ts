@@ -99,9 +99,11 @@ function generateFieldDefinition(field: IRField): string {
   // Add default values
   if (field.default !== undefined && !field.primaryKey) {
     if (typeof field.default === 'string') {
-      fieldDef += ` @default("${field.default}")`;
-    } else if (field.type.toLowerCase() === 'datetime' && field.default === 'now') {
-      fieldDef += ' @default(now())';
+      if (field.type.toLowerCase() === 'datetime' && field.default === 'now') {
+        fieldDef += ' @default(now())';
+      } else {
+        fieldDef += ` @default("${field.default}")`;
+      }
     } else {
       fieldDef += ` @default(${field.default})`;
     }

@@ -1,6 +1,7 @@
-import { IApp } from '@stalmer1/core';
-import * as path from 'path';
+import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import * as fs from 'fs';
+import * as path from 'path';
+import { IApp } from '../src';
 
 // Helper utility for test file validation
 interface FileExpectation {
@@ -124,19 +125,20 @@ jest.mock('@stalmer1/frontend-generator', () => ({
 }));
 
 export async function testFullGeneration(app: IApp, outDir: string) {
-  const { generateBackend, generateDockerFiles } = require('@stalmer1/backend-generator');
-  const { generateFrontend } = require('@stalmer1/frontend-generator');
+  // Use dynamic imports with type annotations
+  const backendGen = await import('@stalmer1/backend-generator');
+  const frontendGen = await import('@stalmer1/frontend-generator');
   
   // Ensure the test templates directory is used
   const originalTemplatesDir = process.env.STALMER1_TEMPLATES_DIR;
   process.env.STALMER1_TEMPLATES_DIR = path.join(__dirname, 'templates');
   
   try {
-    await generateBackend(app, path.join(outDir, 'backend'));
-    await generateFrontend(app, path.join(outDir, 'frontend'));
-    generateDockerFiles(outDir);
+    await backendGen.generateBackend(app, path.join(outDir, 'backend'));
+    await frontendGen.generateFrontend(app, path.join(outDir, 'frontend'));
+    await backendGen.generateDockerFiles(outDir, app.config?.db || 'sqlite');
+    return path.join(outDir, 'backend');
   } finally {
-    // Restore the original templates directory
     if (originalTemplatesDir) {
       process.env.STALMER1_TEMPLATES_DIR = originalTemplatesDir;
     } else {

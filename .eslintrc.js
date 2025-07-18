@@ -13,5 +13,24 @@ module.exports = {
     jest: true
   },
   ignorePatterns: ['dist/', 'node_modules/'],
-  rules: {}
+  rules: {
+    '@typescript-eslint/no-unused-vars': ['error', { 'argsIgnorePattern': '^_', 'varsIgnorePattern': '^_' }],
+    'no-case-declarations': 'error',
+    'prefer-const': 'error'
+  },
+  overrides: [
+    {
+      files: ['*.test.ts', '*.test.js', '**/__tests__/**'],
+      rules: {
+        '@typescript-eslint/no-unused-vars': 'warn',
+        '@typescript-eslint/no-explicit-any': 'off'
+      }
+    },
+    {
+      files: ['*.js'],
+      rules: {
+        '@typescript-eslint/no-var-requires': 'off'
+      }
+    }
+  ]
 };

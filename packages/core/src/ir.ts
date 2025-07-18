@@ -20,7 +20,7 @@ export interface IRField {
   type: string;
   required?: boolean;
   unique?: boolean;
-  default?: any;
+  default?: string | number | boolean | null;
   primaryKey?: boolean;
   optional?: boolean;
   readonly?: boolean;
@@ -50,7 +50,7 @@ export interface IRPage {
   entity?: string; // Optional for dashboard/custom pages
   route: string;
   permissions?: string[];
-  props?: Record<string, any>; // For columns, fields, actions, filters, etc.
+  props?: Record<string, string | number | boolean | null | string[] | Record<string, unknown>>; // For columns, fields, actions, filters, etc.
   // Additional properties used in tests
   columns?: Array<{ field: string; label: string }>;
   title?: string;
@@ -93,5 +93,5 @@ export interface IRWorkflow {
 
 export interface IRWorkflowStep {
   action: string;
-  inputs: Record<string, any>;
+  inputs: Record<string, string | number | boolean | null | string[] | Record<string, unknown>>;
 }

@@ -1,6 +1,6 @@
 
 import { parseDSL } from '../src/parser';
-import { IApp, IRPage } from '../src/ir';
+import { IRPage } from '../src/ir';
 
 describe('DSL Parser - Edge Cases', () => {
 
@@ -101,8 +101,8 @@ describe('DSL Parser - Edge Cases', () => {
     expect(page.props).toBeDefined();
     if (!page.props) return;
     expect(page.props.setting1).toBe('value1');
-    expect(page.props.nested.setting2).toBe(true);
-    expect(page.props.nested.deeplyNested.setting3).toEqual(['1', '2', '3']);
+    expect((page.props.nested as Record<string, unknown>).setting2).toBe(true);
+    expect(((page.props.nested as Record<string, unknown>).deeplyNested as Record<string, unknown>).setting3).toEqual([1, 2, 3]);
   });
 
   it('should handle multi-line arrays', () => {

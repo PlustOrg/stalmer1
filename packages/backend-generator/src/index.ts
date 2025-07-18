@@ -57,7 +57,7 @@ export async function generateBackend(app: IApp, outDir: string) {
   const sentryDsn = app.config?.integrations?.monitoring?.dsn;
   const rbac = !!(app.pages && app.pages.some((p: IRPage) => p.permissions));
   // Build permissions map for controllers
-  const permissions: Record<string, any> = {};
+  const permissions: Record<string, Record<string, string[]>> = {};
   if (app.pages) {
     for (const page of app.pages) {
       if (page.permissions && page.entity) {

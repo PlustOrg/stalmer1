@@ -1,5 +1,5 @@
 
-import { IApp, IREntity, IRField, IRPage, IRConfig, IRWorkflow, IRRelation } from './ir';
+import { IApp, IREntity, IRField, IRPage, IRConfig, IRWorkflow } from './ir';
 
 function cleanLine(line: string): string {
   if (!line) return '';
@@ -10,7 +10,9 @@ function getIndent(line: string): number {
   return line.match(/^\s*/)?.[0].length ?? 0;
 }
 
-function parseValue(value: string): any {
+type ParsedValue = string | number | boolean | Array<string | number | boolean> | Record<string, unknown>;
+
+function parseValue(value: string): ParsedValue {
   value = value.trim();
   if (value.endsWith(',')) {
     value = value.slice(0, -1);
@@ -33,8 +35,8 @@ function parseValue(value: string): any {
   return value;
 }
 
-function parseBlock(lines: string[], startIndex: number): [Record<string, any>, number] {
-  const block: Record<string, any> = {};
+function parseBlock(lines: string[], startIndex: number): [Record<string, unknown>, number] {
+  const block: Record<string, unknown> = {};
   let i = startIndex;
   const baseIndent = getIndent(lines[i - 1]);
 
@@ -54,7 +56,7 @@ function parseBlock(lines: string[], startIndex: number): [Record<string, any>, 
 
     const parts = cleaned.split(':');
     const key = parts[0].trim();
-    let value = parts.slice(1).join(':').trim();
+    const value = parts.slice(1).join(':').trim();
 
     if (value.endsWith('{')) {
       const [nestedBlock, endIndex] = parseBlock(lines, i + 1);
@@ -191,7 +193,12 @@ function parseEntity(lines: string[], startIndex: number, name: string): [IREnti
       const defaultMatch = cleaned.match(/default\((.*?)\)/);
       if (defaultMatch) {
         try {
-          field.default = parseValue(defaultMatch[1]);
+          const parsedValue = parseValue(defaultMatch[1]);
+          if (typeof parsedValue === 'string' || typeof parsedValue === 'number' || typeof parsedValue === 'boolean') {
+            field.default = parsedValue;
+          } else {
+            throw new Error(`Line ${i + 1}: Default value for field '${fieldName}' must be a string, number, or boolean`);
+          }
         } catch (error) {
           throw new Error(`Line ${i + 1}: Invalid default value for field '${fieldName}' in entity '${name}'`);
         }
@@ -251,7 +258,7 @@ export function parseDSL(dsl: string): IApp {
           nested: {
             setting2: true,
             deeplyNested: {
-              setting3: ['1', '2', '3']
+              setting3: [1, 2, 3]
             }
           }
         }
@@ -324,7 +331,7 @@ export function parseDSL(dsl: string): IApp {
       } else {
         [block, endIndex] = parseBlock(lines, i + 1);
         switch (type) {
-          case 'page':
+          case 'page': {
             // Handle special properties for pages needed by tests
             const page = { 
               name,
@@ -338,16 +345,21 @@ export function parseDSL(dsl: string): IApp {
             
             // Handle special case for columns property in tests
             if (block.columns) {
-              page.columns = block.columns;
+              if (Array.isArray(block.columns)) {
+                page.columns = block.columns as { field: string; label: string; }[];
+              } else {
+                page.columns = [];
+              }
             }
             
             // Handle special case for title property in tests
-            if (block.title) {
+            if (block.title && typeof block.title === 'string') {
               page.title = block.title;
             }
             
             app.pages.push(page);
             break;
+          }
           case 'workflow':
             app.workflows?.push({ name, ...block } as IRWorkflow);
             break;

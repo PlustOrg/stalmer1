@@ -4,6 +4,7 @@ import { generateFullProject } from './src/full-generator';
 import * as fs from 'fs';
 import * as path from 'path';
 import execa from 'execa';
+import { spawnSync } from 'child_process';
 
 const program = new Command();
 
@@ -12,7 +13,7 @@ program
   .description('Run docker-compose up in the generated project')
   .action(() => {
     const cwd = process.cwd();
-    require('child_process').spawnSync('docker-compose', ['up'], {
+    spawnSync('docker-compose', ['up'], {
       cwd,
       stdio: 'inherit',
     });
