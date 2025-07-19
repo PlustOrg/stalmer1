@@ -1,27 +1,24 @@
-<% pages.filter(page => page.type === 'table').map(page => { %>
-  const entityName = page.entity || 'Item';
-  const endpoint = page.entity ? page.entity.toLowerCase() + 's' : 'items';
-  
-  return `import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+// <%= page.name %>Table.tsx
+
+import React from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import api from '../api';
-import { PlusCircle, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import api from '../../api';
+import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -29,23 +26,30 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 
-const fetch${entityName}s = async () => {
-  const { data } = await api.get('/${entityName.toLowerCase()}');
+<%
+  const entityName = page.entity.name || 'Item';
+%>
+
+const fetch<%= entityName %>s = async () => {
+  const { data } = await api.get(`/api/<%= entityName.toLowerCase() %>s`);
   return data;
 };
 
-const delete${entityName} = async (id: string) => {
-  await api.delete(\`/${entityName.toLowerCase()}/\${id}\`);
+const delete<%= entityName %> = async (id: string) => {
+  await api.delete(`/api/<%= entityName.toLowerCase() %>s/${id}`);
 };
 
-export function ${page.name}Table() {
+export function <%= page.name %>Table() {
   const queryClient = useQueryClient();
-  const { data, isLoading, error } = useQuery('${entityName.toLowerCase()}s', fetch${entityName}s);
-  const mutation = useMutation(delete${entityName}, {
+  const { data, isLoading, error } = useQuery(
+    '<%= entityName.toLowerCase() %>s',
+    fetch<%= entityName %>s
+  );
+  const mutation = useMutation(delete<%= entityName %>, {
     onSuccess: () => {
-      queryClient.invalidateQueries('${entityName.toLowerCase()}s');
+      queryClient.invalidateQueries('<%= entityName.toLowerCase() %>s');
     },
   });
 
@@ -55,18 +59,20 @@ export function ${page.name}Table() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>${page.title || entityName + 's'}</CardTitle>
+        <CardTitle>
+          <%= page.title || entityName + 's' %>
+        </CardTitle>
         <CardDescription>
-          Manage your ${entityName.toLowerCase()}s.
+          Manage your <%= entityName.toLowerCase() %>s.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <% for (const field of pages[0].entity.fields) { %>
+              <% for (const field of page.entity.fields) { %>
                 <% if (field.name !== 'id' && !field.isPassword) { %>
-              <TableHead><%= field.name %></TableHead>
+              <TableHead key="<%= field.name %>"><%= field.name %></TableHead>
                 <% } %>
               <% } %>
               <TableHead>
@@ -75,11 +81,11 @@ export function ${page.name}Table() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((item: any) => (
+            {data && data.map((item: any) => (
               <TableRow key={item.id}>
-                <% for (const field of pages[0].entity.fields) { %>
+                <% for (const field of page.entity.fields) { %>
                   <% if (field.name !== 'id' && !field.isPassword) { %>
-                <TableCell>{item.<%= field.name %>}</TableCell>
+                <TableCell key="<%= field.name %>">{item["<%= field.name %>"]}</TableCell>
                   <% } %>
                 <% } %>
                 <TableCell>
@@ -100,7 +106,7 @@ export function ${page.name}Table() {
                         <Pencil className="mr-2 h-4 w-4" />
                         Edit
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={<%="() => mutation.mutate(item.id)"%>}>
+                      <DropdownMenuItem onClick={() => mutation.mutate(item.id)}>
                         <Trash2 className="mr-2 h-4 w-4" />
                         Delete
                       </DropdownMenuItem>
@@ -114,5 +120,4 @@ export function ${page.name}Table() {
       </CardContent>
     </Card>
   );
-}`;
-}).join('\n\n') %>
+}

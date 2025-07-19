@@ -1,33 +1,31 @@
-<% pages.filter(page => page.type === 'form').map(page => {
-  const entityName = page.entity || 'Item';
-  const endpoint = page.entity ? page.entity.toLowerCase() + 's' : 'items';
-  
-  return `import React from 'react';
+// <%= page.name %>Form.tsx
+
+import React from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQueryClient } from 'react-query';
-import api from '../api';
-import { Button } from "@/components/ui/button"
+import api from '../../api';
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
-const create<%= pages[0].entity.name %> = async (data: any) => {
-  const { data: response } = await api.post('/<%= pages[0].entity.name.toLowerCase() %>', data);
+const create<%= page.entity.name %> = async (data: any) => {
+  const { data: response } = await api.post(`/api/<%= page.entity.name.toLowerCase() %>s`, data);
   return response;
 };
 
-export default function <%= pages[0].name %>Form() {
+export function <%= page.name %>Form() {
   const queryClient = useQueryClient();
   const { register, handleSubmit, formState: { errors } } = useForm();
-  const mutation = useMutation(create<%= pages[0].entity.name %>, {
+  const mutation = useMutation(create<%= page.entity.name %>, {
     onSuccess: () => {
-      queryClient.invalidateQueries('<%= pages[0].entity.name.toLowerCase() %>s');
+      queryClient.invalidateQueries('<%= page.entity.name.toLowerCase() %>s');
     },
   });
 
@@ -38,26 +36,41 @@ export default function <%= pages[0].name %>Form() {
   return (
     <Card className="w-[350px]">
       <CardHeader>
-        <CardTitle>Create <%= pages[0].entity.name %></CardTitle>
-        <CardDescription>Create a new <%= pages[0].entity.name.toLowerCase() %>.</CardDescription>
+        <CardTitle>Create <%= page.entity.name %></CardTitle>
+        <CardDescription>
+          Create a new <%= page.entity.name.toLowerCase() %>.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="grid w-full items-center gap-4">
-            <% for (const field of pages[0].entity.fields) { %>
-              <% if (field.name !== 'id') { %>
-            <div className="flex flex-col space-y-1.5">
+            <% for (const field of page.entity.fields) { %>
+              <% if (field.name !== 'id' && !field.isPassword) { %>
+            <div className="flex flex-col space-y-1.5" key="<%= field.name %>">
               <Label htmlFor="<%= field.name %>"><%= field.name %></Label>
-              <Input id="<%= field.name %>" {...register("<%= field.name %>", { required: true })} />
-              {errors.<%= field.name %> && <span>This field is required</span>}
+              <Input
+                id="<%= field.name %>"
+                type="<%= field.isPassword ? 'password' : 'text' %>"
+                {...register("<%= field.name %>", { required: true })}
+              />
+              {errors["<%= field.name %>"] && (
+                <span className="text-red-500 text-xs">This field is required</span>
+              )}
             </div>
               <% } %>
             <% } %>
           </div>
-          <Button type="submit" className="mt-4">Create</Button>
+          <Button type="submit" className="mt-4" disabled={mutation.isLoading}>
+            {mutation.isLoading ? 'Creating...' : 'Create'}
+          </Button>
+          {mutation.isError && (
+            <div className="text-red-500 mt-2">Error creating <%= page.entity.name.toLowerCase() %>. Please try again.</div>
+          )}
+          {mutation.isSuccess && (
+            <div className="text-green-600 mt-2">Successfully created!</div>
+          )}
         </form>
       </CardContent>
     </Card>
   );
-}`;
-}).join('\n\n') %>
+}

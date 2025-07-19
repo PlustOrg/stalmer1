@@ -1,86 +1,94 @@
-<% pages.filter(page => page.type === 'details').map(page => {
-  const entityName = page.entity || 'Item';
-  const endpoint = page.entity ? page.entity.toLowerCase() + 's' : 'items';
-  
-  return `import React from 'react';
+// <%= page.name %>Details.tsx
+
+import React, { useState } from 'react';
 import { useQuery } from 'react-query';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import api from '../api';
+import api from '../../api';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 
-const fetch<%= pages[0].entity.name %> = async (id: string) => {
-  const { data } = await api.get(\`/<%= pages[0].entity.name.toLowerCase() %>/\${id}\`);
+const fetch<%= page.entity.name %> = async (id: string) => {
+  const { data } = await api.get(`/api/<%= page.entity.name.toLowerCase() %>s/${id}`);
   return data;
 };
 
-export default function ${page.name}Details() {
+export function <%= page.name %>Details() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data, isLoading, error } = useQuery(['<%= pages[0].entity.name.toLowerCase() %>', id], () => fetch<%= pages[0].entity.name %>(id!));
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const { data, isLoading, error } = useQuery(
+    ['<%= page.entity.name.toLowerCase() %>', id],
+    () => fetch<%= page.entity.name %>(id!),
+    { enabled: !!id }
+  );
 
   const handleDelete = async () => {
     if (!id) return;
-    
     if (window.confirm('Are you sure you want to delete this item?')) {
       try {
-        await api.delete(\`/api/${endpoint}/\${id}\`);
-        navigate('${page.route.replace('details', 'list')}');
+        await api.delete(`/api/<%= page.entity.name.toLowerCase() %>s/${id}`);
+        navigate('<%= page.route.replace("details", "list") %>');
       } catch (err) {
-        console.error('Error deleting item:', err);
-        setError('Failed to delete item. Please try again.');
+        setErrorMsg('Failed to delete item. Please try again.');
       }
     }
   };
 
-  if (isLoading) return <div className="loading">Loading...</div>;
-  if (error) return <div className="error">Error loading data</div>;
+  if (isLoading) return <div>Loading...</div>;
+  if (error || errorMsg) return <div>Error loading data{errorMsg ? `: ${errorMsg}` : ''}</div>;
+  if (!data) return <div>No data found.</div>;
 
   return (
     <div>
-      <div className="main-header">
-        <h1 className="page-title">${entityName} Details</h1>
-        <div className="actions">
-          <Link to={\`${page.route.replace('details', 'edit')}?id=\${id}\`}>
-            <button className="secondary">Edit</button>
+      <div className="main-header flex items-center justify-between mb-6">
+        <h1 className="page-title text-2xl font-bold">
+          <%= page.entity.name %> Details
+        </h1>
+        <div className="actions flex gap-2">
+          <Link to={`<%= page.route.replace("details", "edit") %>?id=${id}`}>
+            <Button variant="secondary">Edit</Button>
           </Link>
-          <button className="danger" onClick={handleDelete}>
+          <Button variant="destructive" onClick={handleDelete}>
             Delete
-          </button>
-          <button className="secondary" onClick={() => navigate('${page.route.replace('details', 'list')}')}>
+          </Button>
+          <Button variant="secondary" onClick={() => navigate('<%= page.route.replace("details", "list") %>')}>
             Back to List
-          </button>
+          </Button>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>{data.<%= pages[0].entity.fields[1]?.name || 'name' %>}</CardTitle>
+          <CardTitle>
+            {data.<%= page.entity.fields[1]?.name || 'name' %>}
+          </CardTitle>
           <CardDescription>
-            Details for <%= pages[0].entity.name.toLowerCase() %> {data.id}.
+            Details for <%= page.entity.name.toLowerCase() %> {data.id}.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4">
-            <% for (const field of pages[0].entity.fields) { %>
+            <% for (const field of page.entity.fields) { %>
               <% if (field.name !== 'id' && !field.isPassword) { %>
-            <div>
+            <div key="<%= field.name %>">
               <p className="font-semibold"><%= field.name %></p>
-              <p>{data.<%= field.name %>}</p>
+              <p>{data["<%= field.name %>"]}</p>
             </div>
               <% } %>
             <% } %>
           </div>
-          <Button className="mt-4" onClick={<%="() => navigate(-1)"%>}>Back</Button>
+          <Button className="mt-4" onClick={() => navigate(-1)}>
+            Back
+          </Button>
         </CardContent>
       </Card>
     </div>
   );
-}`;
-}).join('\n\n') %>
+}
