@@ -1,6 +1,6 @@
 {
   "name": "@stalmer1/core",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "Stalmer1 Core Logic (IR, parser, validation)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
