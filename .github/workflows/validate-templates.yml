@@ -1,0 +1,32 @@
+name: Validate Templates
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'packages/**/templates/**/*.ejs'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'packages/**/templates/**/*.ejs'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Validate EJS Templates
+      run: |
+        chmod +x ./scripts/validate-templates.sh
+        ./scripts/validate-templates.sh

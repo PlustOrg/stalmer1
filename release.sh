@@ -41,6 +41,15 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+# Validate EJS templates
+echo -e "${GREEN}Validating EJS templates...${NC}"
+./scripts/validate-templates.sh
+
+if [ $? -ne 0 ]; then
+  echo -e "${RED}Error: Template validation failed. Please fix template issues before releasing.${NC}"
+  exit 1
+fi
+
 # Build packages
 echo -e "${GREEN}Building packages...${NC}"
 npm run build

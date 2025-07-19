@@ -4,6 +4,7 @@ import { initCommand } from './init';
 import { generateCommand } from './generate';
 import { testCommand } from './commands/testCommand';
 import { serveCommand } from './serve';
+import { validateCommand } from './commands/validate';
 import { version } from '../package.json';
 
 const program = new Command();
@@ -17,5 +18,6 @@ program.addCommand(initCommand);
 program.addCommand(generateCommand);
 program.addCommand(testCommand);
 program.addCommand(serveCommand);
+program.addCommand(validateCommand());
 
 program.parse(process.argv);

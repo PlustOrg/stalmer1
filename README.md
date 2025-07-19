@@ -90,6 +90,7 @@ page PostForm {
 - `stalmer1 generate` - Generate application code from DSL
 - `stalmer1 serve` - Start the generated application locally
 - `stalmer1 test` - Run tests for the generated application
+- `stalmer1 validate` - Validate all EJS templates for compilation errors
 
 For more information, see the [CLI Reference](docs/CLI_REFERENCE.md).
 

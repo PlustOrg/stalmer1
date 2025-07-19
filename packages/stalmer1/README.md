@@ -90,6 +90,10 @@ Starts both the frontend and backend servers.
 
 Runs tests for the generated application.
 
+### `stalmer1 validate`
+
+Validates all EJS templates for syntax errors and undefined variables.
+
 ## Documentation
 
 For more detailed documentation, please visit the [official documentation](https://github.com/PlustOrg/stalmer1/tree/main/docs).

@@ -1,46 +1,47 @@
 import { generateFrontend } from '..';
 import * as fs from 'fs';
-import { IApp } from '@stalmer1/core';
-
-jest.mock('fs', () => ({
-  ...jest.requireActual('fs'),
-  existsSync: jest.fn(),
-  mkdirSync: jest.fn(),
-  writeFileSync: jest.fn(),
-  readFileSync: jest.fn(),
-  readdirSync: jest.fn(),
-}));
-
-const mockedFs = fs as jest.Mocked<typeof fs>;
+import { IApp, parseDSL } from '@stalmer1/core';
+import path from 'path';
+import os from 'os';
 
 describe('generateFrontend', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+  let parsedApp: IApp;
+  let tempDir: string;
+
+  beforeAll(() => {
+    const dslFilePath = path.join(__dirname, 'test-app.dsl');
+    const dslContent = fs.readFileSync(dslFilePath, 'utf-8');
+    
+    try {
+      parsedApp = parseDSL(dslContent);
+    } catch (error) {
+      console.error('Error parsing DSL file:', error);
+      throw error;
+    }
   });
 
-  it('should generate frontend files', async () => {
-    const app: IApp = {
-      name: 'TestApp',
-      entities: [],
-      pages: [],
-      config: {
-        auth: {
-          provider: 'jwt',
-          props: {
-            clerkPublishableKey: 'test-key',
-            auth0Domain: 'test-domain',
-            auth0ClientId: 'test-client-id'
-          }
-        }
-      }
-    };
+  beforeEach(() => {
+    // Create a unique temporary directory for each test run
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'frontend-test-'));
+  });
 
-    mockedFs.existsSync.mockReturnValue(true);
-    mockedFs.readFileSync.mockReturnValue('');
-    mockedFs.readdirSync.mockReturnValue(['button.tsx.ejs', 'card.tsx.ejs', 'input.tsx.ejs', 'label.tsx.ejs', 'table.tsx.ejs'] as any);
+  afterEach(() => {
+    // Clean up the temporary directory after each test
+    if (fs.existsSync(tempDir)) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 
-    generateFrontend(app, '/out');
+  it('should generate frontend files in a temporary directory', () => {
+    generateFrontend(parsedApp, tempDir);
 
-    expect(mockedFs.writeFileSync).toHaveBeenCalled();
+    // Verify that some expected files and directories were created
+    const uiComponentsPath = path.join(tempDir, 'src', 'components', 'ui');
+    expect(fs.existsSync(path.join(uiComponentsPath, 'button.tsx'))).toBe(true);
+    expect(fs.existsSync(path.join(uiComponentsPath, 'card.tsx'))).toBe(true);
+    expect(fs.existsSync(path.join(uiComponentsPath, 'input.tsx'))).toBe(true);
+    expect(fs.existsSync(path.join(uiComponentsPath, 'label.tsx'))).toBe(true);
+    expect(fs.existsSync(path.join(uiComponentsPath, 'table.tsx'))).toBe(true);
+    expect(fs.existsSync(path.join(tempDir, 'package.json'))).toBe(true);
   });
 });
