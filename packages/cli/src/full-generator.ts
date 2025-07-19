@@ -30,7 +30,7 @@ export async function generateFullProject(app: IApp, outDir: string, verbose: bo
   // Generate Docker files
   console.log('Generating Docker files...');
   const db = app.config?.db === 'postgresql' ? 'postgresql' : 'sqlite';
-  generateDockerFiles(outDir, db);
+  generateDockerFiles(app, outDir, db);
   
   // Generate GitHub Actions workflows
   console.log('Generating CI/CD workflows...');
