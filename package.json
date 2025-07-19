@@ -1,6 +1,6 @@
 {
   "name": "stalmer1",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Stalmer1: DSL-driven full-stack web-app generator.",
   "workspaces": [
     "packages/*"
