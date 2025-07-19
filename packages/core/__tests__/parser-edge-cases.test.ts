@@ -1,4 +1,3 @@
-
 import { parseDSL } from '../src/parser';
 import { IRPage } from '../src/ir';
 
@@ -23,7 +22,8 @@ describe('DSL Parser - Edge Cases', () => {
     const app = parseDSL(dsl);
     expect(app.entities).toHaveLength(1);
     expect(app.entities[0].name).toBe('User');
-    expect(app.entities[0].fields).toHaveLength(0);
+    expect(app.entities[0].fields).toHaveLength(1); // Now expects 1 for the auto-added id
+    expect(app.entities[0].fields[0].name).toBe('id');
   });
 
   it('should handle various data types correctly', () => {
@@ -43,16 +43,16 @@ describe('DSL Parser - Edge Cases', () => {
     `;
     const app = parseDSL(dsl);
     const fields = app.entities[0].fields;
-    expect(fields).toHaveLength(10);
+    expect(fields).toHaveLength(11); // 10 + 1 for auto-id
     
     // Just check that we have the right number of fields
     // The types may be normalized differently depending on implementation
-    expect(fields.length).toEqual(10);
+    expect(fields.length).toEqual(11);
     
     // Check that each field has the correct name
     const fieldNames = fields.map(f => f.name);
     expect(fieldNames).toEqual([
-      'f_string', 'f_text', 'f_int', 'f_float', 
+      'id', 'f_string', 'f_text', 'f_int', 'f_float', 
       'f_decimal', 'f_boolean', 'f_datetime', 
       'f_date', 'f_uuid', 'f_json'
     ]);
@@ -123,7 +123,7 @@ describe('DSL Parser - Edge Cases', () => {
     expect(page.columns).toBeDefined();
     if (!page.columns) return;
     expect(page.columns).toHaveLength(2);
-    expect(page.columns[0].field).toBe('name');
+    expect((page.columns[0] as any).field).toBe('name');
   });
 
   it('should throw an error for a malformed block', () => {

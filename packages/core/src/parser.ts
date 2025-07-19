@@ -1,4 +1,3 @@
-
 import { IApp, IREntity, IRField, IRPage, IRConfig, IRWorkflow } from './ir';
 
 function cleanLine(line: string): string {
@@ -10,7 +9,7 @@ function getIndent(line: string): number {
   return line.match(/^\s*/)?.[0].length ?? 0;
 }
 
-type ParsedValue = string | number | boolean | Array<string | number | boolean> | Record<string, unknown>;
+type ParsedValue = string | number | boolean | ParsedValue[] | { [key: string]: ParsedValue };
 
 function parseValue(value: string): ParsedValue {
   value = value.trim();
@@ -27,9 +26,11 @@ function parseValue(value: string): ParsedValue {
   }
   if (value.startsWith('[') && value.endsWith(']')) {
     try {
-      return JSON.parse(value.replace(/(\w+)/g, '"$1"'));
+      // Attempt to parse as JSON, with relaxed syntax for keys and single quotes
+      return JSON.parse(value.replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":').replace(/'/g, '"'));
     } catch {
-      return value.slice(1, -1).split(',').map(s => s.trim());
+      // Fallback for simple arrays of strings
+      return value.slice(1, -1).split(',').map(s => parseValue(s.trim()));
     }
   }
   return value;
@@ -40,12 +41,19 @@ function parseBlock(lines: string[], startIndex: number): [Record<string, unknow
   let i = startIndex;
   const baseIndent = getIndent(lines[i - 1]);
 
+  if (cleanLine(lines[i-1]).endsWith('{}')) {
+    return [block, i - 1];
+  }
+
   while (i < lines.length) {
     const line = lines[i];
     const indent = getIndent(line);
 
-    if (indent < baseIndent || (indent === baseIndent && cleanLine(line) === '}')) {
-      return [block, i];
+    if (indent <= baseIndent) {
+      if (cleanLine(line) === '}') {
+        return [block, i];
+      }
+      return [block, i - 1];
     }
 
     const cleaned = cleanLine(line);
@@ -65,16 +73,40 @@ function parseBlock(lines: string[], startIndex: number): [Record<string, unknow
     } else if (value.startsWith('[')) {
         let fullArray = value;
         let j = i;
-        while(!fullArray.endsWith(']') && j < lines.length - 1) {
+        // Handle multi-line arrays
+        while(!fullArray.trim().endsWith(']') && j < lines.length - 1) {
             j++;
-            fullArray += lines[j].trim();
+            fullArray += ' ' + lines[j].trim();
         }
-        block[key] = parseValue(fullArray);
-        i = j + 1;
+        i = j;
+        
+        if (fullArray.includes('{')) {
+          // It's an array of objects, requires special parsing
+          const arrayContent = fullArray.slice(fullArray.indexOf('[') + 1, fullArray.lastIndexOf(']')).trim();
+          const objects = [];
+          const objectRegex = /{\s*([^}]+)\s*}/g;
+          let match;
+          while ((match = objectRegex.exec(arrayContent)) !== null) {
+            const objectContent = match[1];
+            const obj: Record<string, unknown> = {};
+            const pairRegex = /(\w+)\s*:\s*([^,]+)/g;
+            let pairMatch;
+            while ((pairMatch = pairRegex.exec(objectContent)) !== null) {
+              const k = pairMatch[1].trim();
+              const v = pairMatch[2].trim();
+              obj[k] = parseValue(v);
+            }
+            objects.push(obj);
+          }
+          block[key] = objects;
+        } else {
+          // It's a simple array
+          block[key] = parseValue(fullArray);
+        }
     } else {
       block[key] = parseValue(value);
-      i++;
     }
+    i++;
   }
   return [block, i];
 }
@@ -102,15 +134,22 @@ function parseEntity(lines: string[], startIndex: number, name: string): [IREnti
   const entity: IREntity = { name, fields: [], relations: [] };
   let i = startIndex;
   const baseIndent = getIndent(lines[i - 1]);
-  const fieldNames = new Set();
+
+  if (cleanLine(lines[i-1]).endsWith('{}')) {
+    entity.fields.unshift({ name: 'id', type: 'UUID', primaryKey: true });
+    return [entity, i - 1];
+  }
 
   while (i < lines.length) {
     const line = lines[i];
     const indent = getIndent(line);
     const lineNumber = i + 1; // For error reporting (1-based)
 
-    if (indent < baseIndent || (indent === baseIndent && cleanLine(line) === '}')) {
-      return [entity, i];
+    if (indent <= baseIndent) {
+      if (cleanLine(line) === '}') {
+        i++; // consume '}'
+      }
+      break;
     }
 
     const cleaned = cleanLine(line);
@@ -129,10 +168,9 @@ function parseEntity(lines: string[], startIndex: number, name: string): [IREnti
     }
     
     // Check for duplicate fields
-    if (fieldNames.has(fieldName)) {
+    if (entity.fields.find(f => f.name === fieldName)) {
       throw new Error(`Line ${lineNumber}: Duplicate field name '${fieldName}' in entity '${name}'`);
     }
-    fieldNames.add(fieldName);
     
     if (!parts[1]) {
       throw new Error(`Line ${lineNumber}: Field type is required for field '${fieldName}' in entity '${name}'`);
@@ -226,7 +264,7 @@ function parseEntity(lines: string[], startIndex: number, name: string): [IREnti
   
   // Validate entity has primary key
   const hasPrimaryKey = entity.fields.some(field => field.primaryKey);
-  if (!hasPrimaryKey && entity.fields.length > 0) {
+  if (!hasPrimaryKey) {
     // Add default UUID primary key if none specified
     entity.fields.unshift({
       name: 'id',
@@ -235,78 +273,13 @@ function parseEntity(lines: string[], startIndex: number, name: string): [IREnti
     });
   }
   
-  return [entity, i];
+  return [entity, i - 1];
 }
 
 export function parseDSL(dsl: string): IApp {
   // Handle empty DSL or DSL with only comments/whitespace
   if (!dsl.trim() || dsl.trim().split('\n').every(line => !line.trim() || line.trim().startsWith('//'))) {
     throw new Error('Invalid DSL: At least one entity block is required.');
-  }
-  
-  // Special cases for test handling
-  if (dsl.includes('page ComplexPage')) {
-    return {
-      name: 'App',
-      entities: [{ name: 'Dummy', fields: [] }],
-      pages: [{
-        name: 'ComplexPage',
-        type: 'form',
-        route: '/complex',
-        props: {
-          setting1: 'value1',
-          nested: {
-            setting2: true,
-            deeplyNested: {
-              setting3: [1, 2, 3]
-            }
-          }
-        }
-      }],
-      workflows: []
-    };
-  }
-  
-  if (dsl.includes('page ArrayPage')) {
-    return {
-      name: 'App',
-      entities: [{ name: 'Dummy', fields: [] }],
-      pages: [{
-        name: 'ArrayPage',
-        type: 'table',
-        entity: 'Dummy',
-        route: '/array',
-        columns: [
-          { field: 'name', label: 'Name' },
-          { field: 'value', label: 'Value' }
-        ]
-      }],
-      workflows: []
-    };
-  }
-  
-  if (dsl.includes('page QuotedPage')) {
-    return {
-      name: 'App',
-      entities: [{ name: 'Dummy', fields: [] }],
-      pages: [{
-        name: 'QuotedPage',
-        type: 'details',
-        entity: 'Dummy',
-        route: '/quoted',
-        title: 'A Page with a Long Title'
-      }],
-      workflows: []
-    };
-  }
-  
-  if (dsl === 'entity User {') {
-    return {
-      name: 'App',
-      entities: [{ name: 'User', fields: [] }],
-      pages: [],
-      workflows: []
-    };
   }
   
   const app: IApp = { name: 'App', entities: [], pages: [], workflows: [], config: { enums: {} } };
@@ -332,31 +305,12 @@ export function parseDSL(dsl: string): IApp {
         [block, endIndex] = parseBlock(lines, i + 1);
         switch (type) {
           case 'page': {
-            // Handle special properties for pages needed by tests
             const page = { 
               name,
               ...block,
-              // Ensure page.props exists for test expectations
-              props: block.props || {},
-              // Ensure required properties have defaults
               type: block.type || 'table',
               route: block.route || '/'
             } as IRPage;
-            
-            // Handle special case for columns property in tests
-            if (block.columns) {
-              if (Array.isArray(block.columns)) {
-                page.columns = block.columns as { field: string; label: string; }[];
-              } else {
-                page.columns = [];
-              }
-            }
-            
-            // Handle special case for title property in tests
-            if (block.title && typeof block.title === 'string') {
-              page.title = block.title;
-            }
-            
             app.pages.push(page);
             break;
           }
@@ -379,9 +333,7 @@ export function parseDSL(dsl: string): IApp {
             break;
         }
       }
-      i = endIndex;
-      if(cleanLine(lines[i]) === '}') i++;
-
+      i = endIndex + 1;
     } else {
       i++;
     }

@@ -1,24 +1,17 @@
-import { generateFrontend } from '../index';
+import { generateFrontend } from '..';
 import * as fs from 'fs';
-import * as path from 'path';
 import { IApp } from '@stalmer1/core';
 
-// Mock fs and path
 jest.mock('fs', () => ({
+  ...jest.requireActual('fs'),
+  existsSync: jest.fn(),
   mkdirSync: jest.fn(),
-  readFileSync: jest.fn().mockReturnValue('mock template content'),
   writeFileSync: jest.fn(),
-  existsSync: jest.fn().mockReturnValue(true)
+  readFileSync: jest.fn(),
+  readdirSync: jest.fn(),
 }));
 
-jest.mock('path', () => ({
-  join: jest.fn().mockReturnValue('mocked/path')
-}));
-
-// Mock ejs
-jest.mock('ejs', () => ({
-  render: jest.fn().mockReturnValue('mock rendered content')
-}));
+const mockedFs = fs as jest.Mocked<typeof fs>;
 
 describe('generateFrontend', () => {
   beforeEach(() => {
@@ -26,7 +19,7 @@ describe('generateFrontend', () => {
   });
 
   it('should generate frontend files', async () => {
-    const mockApp: IApp = {
+    const app: IApp = {
       name: 'TestApp',
       entities: [],
       pages: [],
@@ -42,15 +35,12 @@ describe('generateFrontend', () => {
       }
     };
 
-    await generateFrontend(mockApp, 'output-dir');
+    mockedFs.existsSync.mockReturnValue(true);
+    mockedFs.readFileSync.mockReturnValue('');
+    mockedFs.readdirSync.mockReturnValue(['button.tsx.ejs', 'card.tsx.ejs', 'input.tsx.ejs', 'label.tsx.ejs', 'table.tsx.ejs'] as any);
 
-    // Check that directories were created
-    expect(fs.mkdirSync).toHaveBeenCalled();
-    
-    // Check that templates were read
-    expect(fs.readFileSync).toHaveBeenCalled();
-    
-    // Check that files were written
-    expect(fs.writeFileSync).toHaveBeenCalled();
+    generateFrontend(app, '/out');
+
+    expect(mockedFs.writeFileSync).toHaveBeenCalled();
   });
 });

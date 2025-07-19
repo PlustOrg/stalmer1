@@ -333,77 +333,69 @@ describe('Full Project Generation', () => {
           ]
         }
       ],
-      pages: [
-        {
-          name: 'UserDashboard',
-          type: 'dashboard',
-          route: '/dashboard',
-          permissions: ['ADMIN', 'USER']
-        }
-      ],
       workflows: [
         {
-          name: 'UserSignup',
-          trigger: {
-            event: 'user.created',
-            entity: 'User'
-          },
+          name: 'UserOnboarding',
+          trigger: { event: 'user.created', entity: 'User' },
           steps: [
-            {
-              action: 'sendEmail',
-              inputs: {
-                template: 'welcome',
-                recipient: 'trigger.entity.email'
-              }
-            }
+            { action: 'sendEmail', inputs: { to: '{{user.email}}', subject: 'Welcome!', template: 'welcome' } }
           ]
         }
       ],
       config: {
-        db: 'postgresql',
         auth: {
           provider: 'jwt',
           userEntity: 'User',
-          roles: 'UserRole'
-        }
-      }
-    };
-    
-    // Create a separate directory for this complex test
-    const complexDir = path.join(tempDir, 'complex-app');
-    try {
-      fs.mkdirSync(complexDir, { recursive: true });
-    
-      await testFullGeneration(complexApp, complexDir);
-      
-      // Use the validateFiles utility to check expected complex app files
-      validateFiles(complexDir, [
-        // Check for basic structure
-        { path: 'backend/prisma/schema.prisma', shouldExist: true, 
-          contentChecks: [
-            'model User',
-            'provider = "postgresql"', // Should use PostgreSQL for this test
-          ]
+          props: {
+            identityField: 'email',
+            secretField: 'password'
+          }
         },
-        { path: 'frontend/src/App.tsx', shouldExist: true },
-        { path: 'docker-compose.yml', shouldExist: true },
-        
-        // We would check for auth-specific files and workflow registry files
-        // For a real implementation, but in our mocks we're just checking structure
-      ]);
+        integrations: {
+          email: {
+            provider: 'sendgrid',
+            apiKey: 'env(SENDGRID_API_KEY)',
+            defaultFrom: 'noreply@example.com'
+          }
+        },
+        db: 'postgresql'
+      },
+      pages: [
+        {
+          name: 'UserDashboard',
+          type: 'dashboard',
+          entity: 'User',
+          route: '/dashboard',
+          permissions: ['ADMIN', 'USER']
+        }
+      ]
+    };
+
+    const outDir = path.join(__dirname, 'test-output/full-app');
+    fs.mkdirSync(outDir, { recursive: true });
+    
+    await testFullGeneration(complexApp, outDir);
+    
+    // Use the validateFiles utility to check expected complex app files
+    validateFiles(outDir, [
+      // Check for basic structure
+      { path: 'backend/prisma/schema.prisma', shouldExist: true, 
+        contentChecks: [
+          'model User',
+          'provider = "postgresql"', // Should use PostgreSQL for this test
+        ]
+      },
+      { path: 'frontend/src/App.tsx', shouldExist: true },
+      { path: 'docker-compose.yml', shouldExist: true },
       
-      // Additional assertions specific to complex apps
-      const backendSchema = fs.readFileSync(path.join(complexDir, 'backend', 'prisma', 'schema.prisma'), 'utf-8');
-      expect(backendSchema).toContain('model User');
-      expect(backendSchema).toContain('email String @unique');
-      expect(backendSchema).toContain('password String'); // Password field should be mapped to String
-      
-    } catch (error) {
-      // Capture and rethrow with better context for debugging
-      if (error instanceof Error) {
-        throw new Error(`Failed to test complex app generation: ${error.message}`);
-      }
-      throw error;
-    }
+      // We would check for auth-specific files and workflow registry files
+      // For a real implementation, but in our mocks we're just checking structure
+    ]);
+    
+    // Additional assertions specific to complex apps
+    const backendSchema = fs.readFileSync(path.join(outDir, 'backend', 'prisma', 'schema.prisma'), 'utf-8');
+    expect(backendSchema).toContain('model User');
+    expect(backendSchema).toContain('email String @unique');
+    expect(backendSchema).toContain('password String'); // Password field should be mapped to String
   });
 });
