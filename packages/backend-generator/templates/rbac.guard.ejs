@@ -1,72 +1,39 @@
-import { CanActivate, ExecutionContext, Injectable, SetMetadata, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, SetMetadata, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-<% if (authProvider === 'clerk') { %>
-import { ClerkAuthService } from './auth.clerk';
-<% } else if (authProvider === 'auth0') { %>
-import { Auth0Service } from './auth.auth0';
-<% } else { %>
-import { JwtAuthService } from './auth.jwt';
-<% } %>
 
 export const Roles = (...roles: string[]) => SetMetadata('roles', roles);
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(
-    private reflector: Reflector,
-<% if (authProvider === 'clerk') { %>
-    private authService: ClerkAuthService
-<% } else if (authProvider === 'auth0') { %>
-    private authService: Auth0Service
-<% } else { %>
-    private authService: JwtAuthService
-<% } %>
-  ) {}
+  constructor(private reflector: Reflector) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredRoles = this.reflector.get<string[]>('roles', context.getHandler());
-    
-    // If no roles are required, allow access
+  canActivate(context: ExecutionContext): boolean {
+    const requiredRoles = this.reflector.getAllAndOverride<string[]>('roles', [
+      context.getHandler(),
+      context.getClass(),
+    ]);
     if (!requiredRoles || requiredRoles.length === 0) {
-      return true;
+      return true; // No roles required, access granted
     }
     
-    const request = context.switchToHttp().getRequest();
-    const token = request.headers.authorization;
-    
-    if (!token) {
-      throw new UnauthorizedException('No authorization token provided');
-    }
-    
-    // Validate token and get user data
-    const user = await this.authService.validateToken(token);
+    const { user } = context.switchToHttp().getRequest();
     
     if (!user) {
-      throw new UnauthorizedException('Invalid authorization token');
+      // This should ideally be caught by the AuthGuard first
+      throw new ForbiddenException('Authentication credentials were not provided.');
     }
+
+    // Assuming user object has a 'permissions' or 'roles' array.
+    // Clerk uses 'permissions', Auth0 might use 'permissions' in custom claims.
+    // Adjust 'user.permissions' to match your user object structure.
+    const userRoles = user.permissions || user.roles || []; 
     
-    // Store user data in request for controllers
-    request.user = user;
-    
-    // Check if user has required roles
-    const hasRequiredRole = this.hasRequiredRole(user, requiredRoles);
-    
-    if (!hasRequiredRole) {
-      throw new ForbiddenException(
-        `Access denied. Required roles: ${requiredRoles.join(', ')}`
-      );
+    const hasRole = () => requiredRoles.some((role) => userRoles.includes(role));
+
+    if (!hasRole()) {
+      throw new ForbiddenException('You do not have permission to perform this action.');
     }
     
     return true;
-  }
-  
-  private hasRequiredRole(user: any, requiredRoles: string[]): boolean {
-    // User has no roles
-    if (!user.roles || !Array.isArray(user.roles) || user.roles.length === 0) {
-      return false;
-    }
-    
-    // Check if user has at least one of the required roles
-    return requiredRoles.some(role => user.roles.includes(role));
   }
 }

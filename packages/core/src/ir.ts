@@ -47,7 +47,7 @@ export interface IRRelation {
 export interface IRPage {
   name: string;
   type: 'table' | 'form' | 'details' | 'dashboard' | 'custom';
-  entity?: string; // Optional for dashboard/custom pages
+  entity: string; // Now required for all page types except custom
   route: string;
   permissions?: string[];
   props?: Record<string, string | number | boolean | null | string[] | Record<string, unknown>>; // For columns, fields, actions, filters, etc.

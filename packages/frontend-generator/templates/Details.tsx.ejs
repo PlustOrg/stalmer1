@@ -2,48 +2,28 @@
   const entityName = page.entity || 'Item';
   const endpoint = page.entity ? page.entity.toLowerCase() + 's' : 'items';
   
-  return `import React, { useEffect, useState } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+  return `import React from 'react';
+import { useQuery } from 'react-query';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../api';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Button } from '@/components/ui/button';
 
-interface ${entityName} {
-  id: string;
-${page.props?.fields?.map(field => `  ${field.name}: ${field.type || 'any'};`).join('\n') || '  // Define entity fields here based on your model'}
-}
+const fetch<%= pages[0].entity.name %> = async (id: string) => {
+  const { data } = await api.get(\`/<%= pages[0].entity.name.toLowerCase() %>/\${id}\`);
+  return data;
+};
 
-export function ${page.name}Details() {
+export default function ${page.name}Details() {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
-  const queryParams = new URLSearchParams(location.search);
-  const id = queryParams.get('id');
-
-  const [data, setData] = useState<${entityName} | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!id) {
-      setError('No ID provided');
-      setLoading(false);
-      return;
-    }
-
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get<${entityName}>(\`/api/${endpoint}/\${id}\`);
-        setData(response.data);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Failed to load data. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [id]);
+  const { data, isLoading, error } = useQuery(['<%= pages[0].entity.name.toLowerCase() %>', id], () => fetch<%= pages[0].entity.name %>(id!));
 
   const handleDelete = async () => {
     if (!id) return;
@@ -59,17 +39,8 @@ export function ${page.name}Details() {
     }
   };
 
-  if (loading) {
-    return <div className="loading">Loading...</div>;
-  }
-
-  if (error) {
-    return <div className="error">{error}</div>;
-  }
-
-  if (!data) {
-    return <div className="not-found">Item not found</div>;
-  }
+  if (isLoading) return <div className="loading">Loading...</div>;
+  if (error) return <div className="error">Error loading data</div>;
 
   return (
     <div>
@@ -88,28 +59,28 @@ export function ${page.name}Details() {
         </div>
       </div>
 
-      <div className="card">
-        ${page.props?.fields?.map(field => `<div className="detail-row">
-          <div className="detail-label">${field.label || field.name}</div>
-          <div className="detail-value">{data.${field.name}${field.type === 'date' || field.type === 'datetime' ? ' ? new Date(data.' + field.name + ').toLocaleString() : ""'}}</div>
-        </div>`).join('\n        ') || `<div className="detail-row">
-          <div className="detail-label">ID</div>
-          <div className="detail-value">{data.id}</div>
-        </div>
-        
-        {Object.entries(data).map(([key, value]) => {
-          if (key === 'id') return null;
-          return (
-            <div className="detail-row" key={key}>
-              <div className="detail-label">{key}</div>
-              <div className="detail-value">
-                {typeof value === 'object' ? JSON.stringify(value) : value?.toString()}
-              </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>{data.<%= pages[0].entity.fields[1]?.name || 'name' %>}</CardTitle>
+          <CardDescription>
+            Details for <%= pages[0].entity.name.toLowerCase() %> {data.id}.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4">
+            <% for (const field of pages[0].entity.fields) { %>
+              <% if (field.name !== 'id' && !field.isPassword) { %>
+            <div>
+              <p className="font-semibold"><%= field.name %></p>
+              <p>{data.<%= field.name %>}</p>
             </div>
-          );
-        })}`}
-      </div>
+              <% } %>
+            <% } %>
+          </div>
+          <Button className="mt-4" onClick={<%="() => navigate(-1)"%>}>Back</Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }`;
-}).join('\n\n') %}
+}).join('\n\n') %>

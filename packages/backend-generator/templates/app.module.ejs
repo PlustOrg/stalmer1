@@ -1,0 +1,21 @@
+import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { PrismaModule } from './prisma/prisma.module';
+<%_ entities.forEach(entity => { _%>
+import { <%= entity.name %>Module } from './<%= entity.name.toLowerCase() %>/<%= entity.name.toLowerCase() %>.module';
+<%_ }); _%>
+<% if (authProvider) { %>import { AuthModule } from './auth/auth.module';<% } %>
+
+@Module({
+  imports: [
+    PrismaModule,
+    <%_ entities.forEach(entity => { _%>
+    <%= entity.name %>Module,
+    <%_ }); _%>
+    <% if (authProvider) { %>AuthModule,<% } %>
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}

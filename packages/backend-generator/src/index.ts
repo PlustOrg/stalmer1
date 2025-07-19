@@ -74,18 +74,24 @@ export async function generateBackend(app: IApp, outDir: string) {
   const rbacGuardTemplate = fs.readFileSync(path.join(templatesDir, 'rbac.guard.ejs'), 'utf-8');
 
   fs.mkdirSync(path.join(outDir, 'src'), { recursive: true });
-  fs.writeFileSync(
-    path.join(outDir, 'src/modules.ts'),
-    ejs.render(moduleTemplate, { entities })
-  );
-  fs.writeFileSync(
-    path.join(outDir, 'src/controllers.ts'),
-    ejs.render(controllerTemplate, { entities, rbac, permissions, authProvider })
-  );
-  fs.writeFileSync(
-    path.join(outDir, 'src/services.ts'),
-    ejs.render(serviceTemplate, { entities })
-  );
+
+  for (const entity of entities) {
+    const entityDir = path.join(outDir, 'src', entity.name.toLowerCase());
+    fs.mkdirSync(entityDir, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(entityDir, `${entity.name.toLowerCase()}.module.ts`),
+      ejs.render(moduleTemplate, { entity })
+    );
+    fs.writeFileSync(
+      path.join(entityDir, `${entity.name.toLowerCase()}.controller.ts`),
+      ejs.render(controllerTemplate, { entity, rbac, permissions, authProvider })
+    );
+    fs.writeFileSync(
+      path.join(entityDir, `${entity.name.toLowerCase()}.service.ts`),
+      ejs.render(serviceTemplate, { entity })
+    );
+  }
   
   // Generate auth services
   if (rbac) {
@@ -96,37 +102,64 @@ export async function generateBackend(app: IApp, outDir: string) {
   }
   
   // Auth strategy implementation
+  if (authProvider) {
+    const authDir = path.join(outDir, 'src/auth');
+    fs.mkdirSync(authDir, { recursive: true });
+
+    const authModuleTemplate = fs.readFileSync(path.join(templatesDir, 'auth/auth.module.ejs'), 'utf-8');
+    fs.writeFileSync(
+      path.join(authDir, 'auth.module.ts'),
+      ejs.render(authModuleTemplate, { authProvider })
+    );
+  }
+
   if (authProvider === 'clerk') {
     const clerkAuthTemplate = fs.readFileSync(path.join(templatesDir, 'auth-clerk.ts.ejs'), 'utf-8');
     fs.writeFileSync(
-      path.join(outDir, 'src/auth.clerk.ts'), 
-      clerkAuthTemplate
+      path.join(outDir, 'src/auth/clerk.strategy.ts'),
+      ejs.render(clerkAuthTemplate)
     );
-    
-    // Add clerk SDK to package.json
-    addDependencyToPackageJson(outDir, '@clerk/clerk-sdk-node', '^4.10.0');
   } else if (authProvider === 'auth0') {
     const auth0AuthTemplate = fs.readFileSync(path.join(templatesDir, 'auth-auth0.ts.ejs'), 'utf-8');
     fs.writeFileSync(
-      path.join(outDir, 'src/auth.auth0.ts'), 
-      auth0AuthTemplate
+      path.join(outDir, 'src/auth/auth0.strategy.ts'),
+      ejs.render(auth0AuthTemplate)
     );
-    
-    // Add auth0 dependencies to package.json
-    addDependencyToPackageJson(outDir, 'jsonwebtoken', '^9.0.0');
-    addDependencyToPackageJson(outDir, 'jwks-rsa', '^3.0.1');
   } else if (authProvider === 'jwt') {
     const jwtAuthTemplate = fs.readFileSync(path.join(templatesDir, 'auth-jwt.ts.ejs'), 'utf-8');
     fs.writeFileSync(
-      path.join(outDir, 'src/auth.jwt.ts'),
-      jwtAuthTemplate
+      path.join(outDir, 'src/auth/jwt.strategy.ts'),
+      ejs.render(jwtAuthTemplate)
     );
-    
-    // Add JWT dependencies to package.json
+  }
+
+  // Add dependencies to package.json
+  addDependencyToPackageJson(outDir, '@nestjs/common', '^10.0.0');
+  addDependencyToPackageJson(outDir, '@nestjs/core', '^10.0.0');
+  addDependencyToPackageJson(outDir, '@nestjs/platform-express', '^10.0.0');
+  addDependencyToPackageJson(outDir, 'reflect-metadata', '^0.1.13');
+  addDependencyToPackageJson(outDir, 'rxjs', '^7.0.0');
+  addDependencyToPackageJson(outDir, 'class-validator', '^0.14.0');
+  addDependencyToPackageJson(outDir, 'class-transformer', '^0.5.1');
+  
+  if (authProvider) {
+    addDependencyToPackageJson(outDir, '@nestjs/passport', '^10.0.0');
+    addDependencyToPackageJson(outDir, 'passport', '^0.6.0');
+  }
+  if (authProvider === 'jwt') {
     addDependencyToPackageJson(outDir, '@nestjs/jwt', '^10.0.0');
+    addDependencyToPackageJson(outDir, 'passport-jwt', '^4.0.1');
+    addDependencyToPackageJson(outDir, '@types/passport-jwt', '^3.0.8', true);
     addDependencyToPackageJson(outDir, 'bcrypt', '^5.1.0');
     addDependencyToPackageJson(outDir, '@types/bcrypt', '^5.0.0', true);
   }
+  if (authProvider === 'auth0') {
+    addDependencyToPackageJson(outDir, 'passport-auth0', '^1.4.3');
+  }
+  if (authProvider === 'clerk') {
+    addDependencyToPackageJson(outDir, '@clerk/clerk-sdk-node', '^4.13.6');
+  }
+
   // Sentry integration
   if (sentryDsn) {
     const sentryCode = `// Sentry integration\nimport * as Sentry from '@sentry/node';\nSentry.init({ dsn: '${sentryDsn}' });`;
@@ -159,4 +192,45 @@ export async function generateBackend(app: IApp, outDir: string) {
     registry += `\nexport const workflows = ${JSON.stringify(app.workflows, null, 2)};\n`;
     fs.writeFileSync(path.join(outDir, 'src/workflow.registry.ts'), registry);
   }
+
+  // Generate main app files
+  const mainTemplate = fs.readFileSync(path.join(templatesDir, 'main.ts.ejs'), 'utf-8');
+  fs.writeFileSync(
+    path.join(outDir, 'src/main.ts'),
+    ejs.render(mainTemplate, { sentryDsn })
+  );
+
+  const appModuleTemplate = fs.readFileSync(path.join(templatesDir, 'app.module.ejs'), 'utf-8');
+  fs.writeFileSync(
+    path.join(outDir, 'src/app.module.ts'),
+    ejs.render(appModuleTemplate, { entities, authProvider })
+  );
+
+  const appControllerTemplate = fs.readFileSync(path.join(templatesDir, 'app.controller.ejs'), 'utf-8');
+  fs.writeFileSync(
+    path.join(outDir, 'src/app.controller.ts'),
+    ejs.render(appControllerTemplate)
+  );
+
+  const appServiceTemplate = fs.readFileSync(path.join(templatesDir, 'app.service.ejs'), 'utf-8');
+  fs.writeFileSync(
+    path.join(outDir, 'src/app.service.ts'),
+    ejs.render(appServiceTemplate)
+  );
+
+  // Generate Prisma module and service
+  const prismaDir = path.join(outDir, 'src/prisma');
+  fs.mkdirSync(prismaDir, { recursive: true });
+
+  const prismaModuleTemplate = fs.readFileSync(path.join(templatesDir, 'prisma.module.ejs'), 'utf-8');
+  fs.writeFileSync(
+    path.join(prismaDir, 'prisma.module.ts'),
+    ejs.render(prismaModuleTemplate)
+  );
+
+  const prismaServiceTemplate = fs.readFileSync(path.join(templatesDir, 'prisma.service.ejs'), 'utf-8');
+  fs.writeFileSync(
+    path.join(prismaDir, 'prisma.service.ts'),
+    ejs.render(prismaServiceTemplate)
+  );
 }

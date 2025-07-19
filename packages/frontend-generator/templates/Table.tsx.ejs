@@ -4,135 +4,115 @@
   
   return `import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from 'react-query';
 import api from '../api';
+import { PlusCircle, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 
-interface ${entityName} {
-  id: string;
-${page.props?.columns?.map(col => `  ${col.field}: ${col.type || 'any'};`).join('\n') || '  // Define entity fields here based on your model'}
-}
+const fetch${entityName}s = async () => {
+  const { data } = await api.get('/${entityName.toLowerCase()}');
+  return data;
+};
+
+const delete${entityName} = async (id: string) => {
+  await api.delete(\`/${entityName.toLowerCase()}/\${id}\`);
+};
 
 export function ${page.name}Table() {
-  const [data, setData] = useState<${entityName}[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const pageSize = 10;
+  const queryClient = useQueryClient();
+  const { data, isLoading, error } = useQuery('${entityName.toLowerCase()}s', fetch${entityName}s);
+  const mutation = useMutation(delete${entityName}, {
+    onSuccess: () => {
+      queryClient.invalidateQueries('${entityName.toLowerCase()}s');
+    },
+  });
 
-  const fetchData = async (page = 1) => {
-    try {
-      setLoading(true);
-      const response = await api.get<{ data: ${entityName}[], total: number, pages: number }>(\`/api/${endpoint}?page=\${page}&limit=\${pageSize}\`);
-      setData(response.data.data);
-      setTotalPages(response.data.pages || Math.ceil(response.data.total / pageSize) || 1);
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching data:', err);
-      setError('Failed to load data. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData(currentPage);
-  }, [currentPage]);
-
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this item?')) {
-      try {
-        await api.delete(\`/api/${endpoint}/\${id}\`);
-        // Refresh data after deletion
-        fetchData(currentPage);
-      } catch (err) {
-        console.error('Error deleting item:', err);
-        setError('Failed to delete item. Please try again.');
-      }
-    }
-  };
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  if (loading && !data.length) {
-    return <div className="loading">Loading...</div>;
-  }
-
-  if (error) {
-    return <div className="error">{error}</div>;
-  }
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error loading data</div>;
 
   return (
-    <div>
-      <div className="main-header">
-        <h1 className="page-title">${page.title || entityName + 's'}</h1>
-        <Link to="${page.route.replace('list', 'new') || '/new-' + entityName.toLowerCase()}">
-          <button>Add New ${entityName}</button>
-        </Link>
-      </div>
-
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              ${page.props?.columns?.map(col => `<th>${col.label || col.field}</th>`).join('\n              ') || `<th>ID</th>\n              <th>Created</th>\n              <th>Actions</th>`}
-            </tr>
-          </thead>
-          <tbody>
-            {data.length > 0 ? (
-              data.map((item) => (
-                <tr key={item.id}>
-                  ${page.props?.columns?.map(col => `<td>{item.${col.field}}</td>`).join('\n                  ') || `<td>{item.id}</td>\n                  <td>{new Date(item.createdAt).toLocaleString()}</td>`}
-                  <td>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <Link to={\`${page.route.replace('list', 'detail')}?id=\${item.id}\`}>
-                        <button>View</button>
-                      </Link>
-                      <Link to={\`${page.route.replace('list', 'edit')}?id=\${item.id}\`}>
-                        <button className="secondary">Edit</button>
-                      </Link>
-                      <button 
-                        className="danger"
-                        onClick={() => handleDelete(item.id)}
+    <Card>
+      <CardHeader>
+        <CardTitle>${page.title || entityName + 's'}</CardTitle>
+        <CardDescription>
+          Manage your ${entityName.toLowerCase()}s.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <% for (const field of pages[0].entity.fields) { %>
+                <% if (field.name !== 'id' && !field.isPassword) { %>
+              <TableHead><%= field.name %></TableHead>
+                <% } %>
+              <% } %>
+              <TableHead>
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.map((item: any) => (
+              <TableRow key={item.id}>
+                <% for (const field of pages[0].entity.fields) { %>
+                  <% if (field.name !== 'id' && !field.isPassword) { %>
+                <TableCell>{item.<%= field.name %>}</TableCell>
+                  <% } %>
+                <% } %>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        aria-haspopup="true"
+                        size="icon"
+                        variant="ghost"
                       >
+                        <MoreHorizontal className="h-4 w-4" />
+                        <span className="sr-only">Toggle menu</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                      <DropdownMenuItem>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={<%="() => mutation.mutate(item.id)"%>}>
+                        <Trash2 className="mr-2 h-4 w-4" />
                         Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={${page.props?.columns?.length || 3}} style={{ textAlign: 'center' }}>
-                  No data available
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {totalPages > 1 && (
-        <div className="pagination">
-          <button
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-          >
-            Previous
-          </button>
-          <span>
-            Page {currentPage} of {totalPages}
-          </span>
-          <button
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-          >
-            Next
-          </button>
-        </div>
-      )}
-    </div>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }`;
-}).join('\n\n') %}
+}).join('\n\n') %>

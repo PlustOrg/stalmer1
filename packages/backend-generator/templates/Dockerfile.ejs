@@ -1,6 +1,38 @@
 # Dockerfile for backend (NestJS + Prisma)
+
+# ---- Builder Stage ----
+# This stage installs dependencies and builds the source code.
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Copy package configuration and install dependencies
+# Use `npm ci` for faster, more reliable builds in CI environments
+COPY package*.json ./
+RUN npm ci
+
+# Copy the rest of the application source code
+COPY . .
+
+# Generate Prisma Client based on your schema
+RUN npx prisma generate
+
+# Build the TypeScript application
+RUN npm run build
+
+# ---- Production Stage ----
+# This stage creates the final, lightweight production image.
 FROM node:20-alpine
 WORKDIR /app
-COPY . .
-RUN npm install && npm run build
-CMD ["npm", "run", "start:prod"]
+ENV NODE_ENV=production
+
+# Copy only necessary artifacts from the builder stage
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/prisma ./prisma
+
+# Expose the application port (default 4000)
+EXPOSE <%= port || 4000 %>
+
+# Command to run the application
+CMD ["node", "dist/main.js"]

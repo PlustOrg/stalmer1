@@ -1,119 +1,79 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, Outlet } from 'react-router-dom';
 <% if (authProvider === 'clerk') { %>
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, UserButton } from '@clerk/clerk-react';
 <% } else if (authProvider === 'auth0') { %>
 import { useAuth0 } from '@auth0/auth0-react';
+<% } else if (authProvider === 'jwt') { %>
+import { useAuth } from './hooks/useAuth';
 <% } %>
 import Layout from './components/Layout';
-<% 
-// Generate dynamic component imports based on app.pages
-let tableImports = [];
-let formImports = [];
-let detailsImports = [];
 
-pages.forEach(page => {
-  if (page.type === 'table') {
-    tableImports.push(`import { ${page.name}Table } from './components/tables/${page.name}Table';`);
-  } else if (page.type === 'form') {
-    formImports.push(`import { ${page.name}Form } from './components/forms/${page.name}Form';`);
-  } else if (page.type === 'details') {
-    detailsImports.push(`import { ${page.name}Details } from './components/details/${page.name}Details';`);
-  }
-});
-%>
-<% tableImports.forEach(imp => { %>
-<%= imp %>
-<% }); %>
-<% formImports.forEach(imp => { %>
-<%= imp %>
-<% }); %>
-<% detailsImports.forEach(imp => { %>
-<%= imp %>
+<% pages.forEach(page => { %>
+  <% if (page.type === 'table') { %>
+import <%= page.name %>Table from './pages/<%= page.name %>Table';
+  <% } else if (page.type === 'form') { %>
+import <%= page.name %>Form from './pages/<%= page.name %>Form';
+  <% } else if (page.type === 'details') { %>
+import <%= page.name %>Details from './pages/<%= page.name %>Details';
+  <% } %>
 <% }); %>
 
-// Auth guard component
-function RequireAuth({ children, permissions = [] }) {
-<% if (authProvider === 'clerk') { %>
+// A wrapper for routes that require authentication and authorization.
+function ProtectedRoute({ permissions = [] }) {
+  <% if (authProvider === 'clerk') { %>
   const { isSignedIn, user } = useAuth();
-  
   if (!isSignedIn) {
-    // Redirect to login page if not authenticated
     return <Navigate to="/login" replace />;
   }
-  
-  // Check permissions if required
-  if (permissions.length > 0) {
-    const userRole = user?.publicMetadata?.role;
-    if (!userRole || !permissions.includes(userRole)) {
-      return <Navigate to="/unauthorized" replace />;
-    }
+  const userRole = user?.publicMetadata?.role;
+  if (permissions.length > 0 && (!userRole || !permissions.includes(userRole))) {
+    return <Navigate to="/unauthorized" replace />;
   }
-<% } else if (authProvider === 'auth0') { %>
+  <% } else if (authProvider === 'auth0') { %>
   const { isAuthenticated, user } = useAuth0();
-  
   if (!isAuthenticated) {
-    // Redirect to login page if not authenticated
     return <Navigate to="/login" replace />;
   }
-  
-  // Check permissions if required
-  if (permissions.length > 0) {
-    const userRoles = user?.['https://example.com/roles'] || [];
-    const hasPermission = permissions.some(perm => userRoles.includes(perm));
-    if (!hasPermission) {
-      return <Navigate to="/unauthorized" replace />;
-    }
+  const userRoles = user?.['https://your-namespace.com/roles'] || []; // Replace with your Auth0 namespace
+  if (permissions.length > 0 && !permissions.some(p => userRoles.includes(p))) {
+    return <Navigate to="/unauthorized" replace />;
   }
-<% } %>
+  <% } else if (authProvider === 'jwt') { %>
+  const { token, user } = useAuth();
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+  // Assuming user object from JWT payload has a 'roles' array
+  const userRoles = user?.roles || [];
+  if (permissions.length > 0 && !permissions.some(p => userRoles.includes(p))) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+  <% } else { %>
+  // If no auth provider, all routes are public
+  <% } %>
   
-  return <>{children}</>;
+  return <Outlet />;
 }
 
 export function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<div className="page-content">Dashboard</div>} />
+        <Route element={<Layout />}>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<div>Dashboard Content</div>} />
           
-          {/* Generated routes for each page */}
-<% pages.forEach(page => { %>
-          <Route 
-            path="<%= page.route %>" 
-            element={
-              <% if (page.permissions && page.permissions.length > 0) { %>
-              <RequireAuth permissions={<%= JSON.stringify(page.permissions) %>}>
-                <div className="page-content">
-                <% if (page.type === 'table') { %>
-                  <<%= page.name %>Table />
-                <% } else if (page.type === 'form') { %>
-                  <<%= page.name %>Form />
-                <% } else if (page.type === 'details') { %>
-                  <<%= page.name %>Details />
-                <% } %>
-                </div>
-              </RequireAuth>
-              <% } else { %>
-              <div className="page-content">
-              <% if (page.type === 'table') { %>
-                <<%= page.name %>Table />
-              <% } else if (page.type === 'form') { %>
-                <<%= page.name %>Form />
-              <% } else if (page.type === 'details') { %>
-                <<%= page.name %>Details />
-              <% } %>
-              </div>
-              <% } %>
-            } 
-          />
-<% }); %>
-          
-          {/* Error routes */}
-          <Route path="login" element={<div className="page-content">Login</div>} />
-          <Route path="unauthorized" element={<div className="page-content">Unauthorized</div>} />
-          <Route path="*" element={<div className="page-content">Not Found</div>} />
+          {/* Generated protected routes */}
+          <% pages.forEach(page => { %>
+          <Route element={<ProtectedRoute permissions={<%- JSON.stringify(page.permissions || []) %>} />}>
+            <Route path="<%= page.route %>" element={<%= page.type === 'table' ? `<${page.name}Table />` : page.type === 'form' ? `<${page.name}Form />` : `<${page.name}Details />` %>} />
+          </Route>
+          <% }); %>
+
+          {/* Auth-related routes */}
+          <Route path="/login" element={<div>Login Page</div>} />
+          <Route path="/unauthorized" element={<div>Unauthorized Page</div>} />
         </Route>
       </Routes>
     </Router>

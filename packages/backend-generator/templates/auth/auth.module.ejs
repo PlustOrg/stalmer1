@@ -1,0 +1,43 @@
+import { Module } from '@nestjs/common';
+import { PassportModule } from '@nestjs/passport';
+<% if (authProvider === 'jwt') { %>
+import { JwtModule } from '@nestjs/jwt';
+import { JwtStrategy } from './jwt.strategy';
+import { AuthService } from './auth.service';
+import { PrismaModule } from '../prisma/prisma.module';
+
+@Module({
+  imports: [
+    PrismaModule,
+    PassportModule,
+    JwtModule.register({
+      secret: process.env.JWT_SECRET, // Make sure to set this in your .env file
+      signOptions: { expiresIn: '60m' },
+    }),
+  ],
+  providers: [AuthService, JwtStrategy],
+  exports: [AuthService],
+})
+export class AuthModule {}
+<% } else if (authProvider === 'clerk') { %>
+import { ClerkStrategy } from './clerk.strategy';
+import { ClerkAuthService } from './clerk.service';
+
+@Module({
+  imports: [PassportModule],
+  providers: [ClerkStrategy, ClerkAuthService],
+  exports: [PassportModule, ClerkAuthService],
+})
+export class AuthModule {}
+<% } else if (authProvider === 'auth0') { %>
+import { Auth0Strategy } from './auth0.strategy';
+import { Auth0Service } from './auth0.service';
+import { PrismaModule } from '../prisma/prisma.module';
+
+@Module({
+  imports: [PassportModule, PrismaModule],
+  providers: [Auth0Strategy, Auth0Service],
+  exports: [PassportModule, Auth0Service],
+})
+export class AuthModule {}
+<% } %>

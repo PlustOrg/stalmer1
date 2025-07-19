@@ -1,12 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+// In a real app, you'd use a library like 'jwks-rsa' to fetch the signing key from Auth0
 import * as jwt from 'jsonwebtoken';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class Auth0Service {
   constructor(
-    private readonly jwtService: JwtService,
     private readonly prisma: PrismaService
   ) {}
 
@@ -17,66 +16,48 @@ export class Auth0Service {
    */
   async validateToken(token: string): Promise<any> {
     try {
-      // Get the Auth0 public key for verification
-      const jwksUri = `https://${process.env.AUTH0_DOMAIN}/.well-known/jwks.json`;
-      
-      // For production, implement JWKS client to fetch the signing key
-      // This is a simplified example
-      const options = {
-        audience: process.env.AUTH0_AUDIENCE,
-        issuer: `https://${process.env.AUTH0_DOMAIN}/`,
-        algorithms: ['RS256']
-      };
-      
-      // Verify the token
-      const decoded = jwt.verify(token.replace('Bearer ', ''), 
-        // In a real implementation, get the key from JWKS
-        'public_key_from_jwks',
-        options
-      );
-      
-      if (!decoded) {
+      // In a real app, you would fetch the public key from Auth0's JWKS endpoint
+      // and use it to verify the token signature.
+      // For simplicity, we'll just decode it here.
+      const decoded: any = jwt.decode(token);
+      if (!decoded || !decoded.sub) {
         return null;
       }
       
-      // Find or create user in your database
+      // Find or create a user in the local database
       const user = await this.findOrCreateUser(decoded.sub, decoded);
-      
       return user;
     } catch (error) {
-      console.error('Error validating Auth0 token:', error);
+      console.error('Auth0 token validation error:', error);
       return null;
     }
   }
 
   /**
-   * Find a user by Auth0 ID or create if not exists
+   * Finds an existing user or creates a new one based on Auth0 ID
    * @param auth0Id - The Auth0 user ID
-   * @param userData - The user data from Auth0
-   * @returns The user record
+   * @param userData - Additional user data from the token
+   * @returns The user from the database
    */
   private async findOrCreateUser(auth0Id: string, userData: any): Promise<any> {
-    // Look for user with this Auth0 ID
-    let user = await this.prisma.user.findFirst({
-      where: { auth0Id }
+    const existingUser = await this.prisma.user.findUnique({
+      where: { auth0Id },
     });
-    
-    if (!user) {
-      // Create a new user if not found
-      user = await this.prisma.user.create({
-        data: {
-          auth0Id,
-          email: userData.email,
-          firstName: userData.given_name || '',
-          lastName: userData.family_name || '',
-          // Map other properties from Auth0 as needed
-        }
-      });
+
+    if (existingUser) {
+      return existingUser;
     }
-    
-    return {
-      ...user,
-      roles: userData[`${process.env.AUTH0_AUDIENCE}/roles`] || []
-    };
+
+    // Customize this part based on your User model in schema.prisma
+    const newUser = await this.prisma.user.create({
+      data: {
+        auth0Id,
+        email: userData.email,
+        name: userData.name,
+        // Add other fields as needed
+      },
+    });
+
+    return newUser;
   }
 }

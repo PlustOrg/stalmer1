@@ -1,117 +1,64 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
-export class JwtAuthService {
+export class AuthService {
   constructor(
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService
   ) {}
 
   /**
-   * Validates user credentials
+   * Validates a user's credentials
    * @param email - The user's email
    * @param password - The user's password
-   * @returns The user if validation is successful
-   * @throws UnauthorizedException if validation fails
+   * @returns The user object if credentials are valid, otherwise null
    */
   async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-    });
-    
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (user && await bcrypt.compare(password, user.password)) {
+      const { password, ...result } = user;
+      return result;
     }
-    
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-    
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _, ...result } = user;
-    return result;
+    return null;
   }
 
   /**
-   * Logs in a user and returns access and refresh tokens
-   * @param user - The user to log in
-   * @returns Object containing access token and refresh token
+   * Generates JWT access and refresh tokens for a user
+   * @param user - The user object
+   * @returns An object with access_token and refresh_token
    */
   async login(user: any) {
-    const payload = { sub: user.id, email: user.email, roles: user.roles || [] };
-    
+    const payload = { sub: user.id, email: user.email };
     return {
-      accessToken: this.jwtService.sign(payload),
-      refreshToken: this.jwtService.sign(payload, { expiresIn: '7d' }),
+      access_token: this.jwtService.sign(payload),
+      // In a real app, you'd handle refresh tokens more securely (e.g., store them in a db)
+      refresh_token: this.jwtService.sign(payload, { expiresIn: '7d' }),
     };
   }
 
   /**
    * Registers a new user
-   * @param userData - The user data for registration
-   * @returns The created user
+   * @param userData - The user's data for registration
+   * @returns The newly created user object
    */
-  async register(userData: { email: string; password: string; firstName?: string; lastName?: string }) {
-    const { email, password, firstName, lastName } = userData;
-    
-    // Check if user already exists
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email },
-    });
-    
+  async register(userData: { email: string; password: string; name?: string; }) {
+    const existingUser = await this.prisma.user.findUnique({ where: { email: userData.email } });
     if (existingUser) {
-      throw new UnauthorizedException('User with this email already exists');
+      throw new BadRequestException('Email already in use');
     }
     
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
-    // Create the user
-    const user = await this.prisma.user.create({
+    const hashedPassword = await bcrypt.hash(userData.password, 10);
+    const newUser = await this.prisma.user.create({
       data: {
-        email,
+        ...userData,
         password: hashedPassword,
-        firstName,
-        lastName,
-        roles: ['USER'], // Default role
       },
     });
-    
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _, ...result } = user;
+    const { password, ...result } = newUser;
     return result;
-  }
-
-  /**
-   * Refreshes an access token using a refresh token
-   * @param refreshToken - The refresh token
-   * @returns A new access token
-   * @throws UnauthorizedException if the refresh token is invalid
-   */
-  async refreshAccessToken(refreshToken: string) {
-    try {
-      const decoded = this.jwtService.verify(refreshToken);
-      const user = await this.prisma.user.findUnique({
-        where: { id: decoded.sub },
-      });
-      
-      if (!user) {
-        throw new UnauthorizedException('Invalid refresh token');
-      }
-      
-      const payload = { sub: user.id, email: user.email, roles: user.roles || [] };
-      
-      return {
-        accessToken: this.jwtService.sign(payload),
-      };
-    } catch (error) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
   }
 
   /**
@@ -121,20 +68,10 @@ export class JwtAuthService {
    */
   async validateToken(token: string): Promise<any> {
     try {
-      const decoded = this.jwtService.verify(token.replace('Bearer ', ''));
-      
-      const user = await this.prisma.user.findUnique({
-        where: { id: decoded.sub },
-      });
-      
-      if (!user) {
-        return null;
-      }
-      
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password, ...result } = user;
-      return { ...result, roles: decoded.roles };
-    } catch (error) {
+      const payload = this.jwtService.verify(token);
+      // You might want to check if the user still exists in the DB
+      return payload;
+    } catch (e) {
       return null;
     }
   }

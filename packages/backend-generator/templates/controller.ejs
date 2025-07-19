@@ -1,59 +1,67 @@
-<%_ entities.forEach(entity => { _%>
-import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, NotFoundException, Patch, Request, UseInterceptors, ClassSerializerInterceptor } from '@nestjs/common';
 import { <%= entity.name %>Service } from './<%= entity.name.toLowerCase() %>.service';
-<% if (rbac) { %>import { RolesGuard, Roles } from './rbac.guard';<% } %>
+<% if (rbac) { %>import { RolesGuard, Roles } from '../rbac.guard';<% } %>
+<% if (authProvider) { %>import { AuthGuard } from '@nestjs/passport';<% } %>
 
-@Controller('<%= entity.name.toLowerCase() %>')
+@Controller('<%= entity.name.toLowerCase() %>s')
+@UseInterceptors(ClassSerializerInterceptor)
+<% if (authProvider) { %>@UseGuards(AuthGuard('<%= authProvider === "jwt" ? "jwt" : authProvider %>'))<% } %>
 <% if (rbac) { %>@UseGuards(RolesGuard)<% } %>
 export class <%= entity.name %>Controller {
-  constructor(private readonly service: <%= entity.name %>Service) {}
+  constructor(private readonly <%= entity.name.toLowerCase() %>Service: <%= entity.name %>Service) {}
 
   @Get()
-  <% if (rbac && permissions[entity.name]?.find) { %>@Roles('<%= permissions[entity.name].find %>')<% } %>
+  <% if (permissions[entity.name] && permissions[entity.name].find) { %>@Roles(<%- JSON.stringify(permissions[entity.name].find) %>)<% } %>
   findAll() {
-    return this.service.findAll();
+    return this.<%= entity.name.toLowerCase() %>Service.findAll();
   }
 
   @Get(':id')
-  <% if (rbac && permissions[entity.name]?.findOne) { %>@Roles('<%= permissions[entity.name].findOne %>')<% } %>
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id);
+  <% if (permissions[entity.name] && permissions[entity.name].find) { %>@Roles(<%- JSON.stringify(permissions[entity.name].find) %>)<% } %>
+  async findOne(@Param('id') id: string) {
+    const record = await this.<%= entity.name.toLowerCase() %>Service.findOne(id);
+    if (!record) {
+      throw new NotFoundException(`<%= entity.name %> with ID ${id} not found`);
+    }
+    return record;
   }
 
   @Post()
-  <% if (rbac && permissions[entity.name]?.create) { %>@Roles('<%= permissions[entity.name].create %>')<% } %>
-  create(@Body() data: any) {
-    return this.service.create(data);
+  <% if (permissions[entity.name] && permissions[entity.name].create) { %>@Roles(<%- JSON.stringify(permissions[entity.name].create) %>)<% } %>
+  create(@Body() create<%= entity.name %>Dto: any) { // Replace 'any' with a proper DTO class
+    return this.<%= entity.name.toLowerCase() %>Service.create(create<%= entity.name %>Dto);
   }
 
-  @Put(':id')
-  <% if (rbac && permissions[entity.name]?.update) { %>@Roles('<%= permissions[entity.name].update %>')<% } %>
-  update(@Param('id') id: string, @Body() data: any) {
-    return this.service.update(id, data);
+  @Patch(':id')
+  <% if (permissions[entity.name] && permissions[entity.name].update) { %>@Roles(<%- JSON.stringify(permissions[entity.name].update) %>)<% } %>
+  update(@Param('id') id: string, @Body() update<%= entity.name %>Dto: any) { // Replace 'any' with a proper DTO class
+    return this.<%= entity.name.toLowerCase() %>Service.update(id, update<%= entity.name %>Dto);
   }
 
   @Delete(':id')
-  <% if (rbac && permissions[entity.name]?.remove) { %>@Roles('<%= permissions[entity.name].remove %>')<% } %>
+  <% if (permissions[entity.name] && permissions[entity.name].delete) { %>@Roles(<%- JSON.stringify(permissions[entity.name].delete) %>)<% } %>
   remove(@Param('id') id: string) {
-    return this.service.remove(id);
+    return this.<%= entity.name.toLowerCase() %>Service.remove(id);
   }
 }
-<%_ }); _%>
 
 <% if (authProvider === 'jwt') { %>
-// AuthController for login/signup
-import { Controller as AuthController, Post as AuthPost, Body as AuthBody } from '@nestjs/common';
-@AuthController('auth')
+@Controller('auth')
 export class AuthController {
-  @AuthPost('login')
-  login(@AuthBody() credentials: any) {
-    // TODO: Implement JWT login logic
-    return { token: 'jwt-token' };
+  constructor(private readonly authService: AuthService) {}
+
+  @Post('login')
+  async login(@Body() req) {
+    const user = await this.authService.validateUser(req.email, req.password);
+    if (!user) {
+      throw new NotFoundException('Invalid credentials');
+    }
+    return this.authService.login(user);
   }
-  @AuthPost('signup')
-  signup(@AuthBody() data: any) {
-    // TODO: Implement signup logic
-    return { user: data };
+
+  @Post('register')
+  async register(@Body() req) {
+    return this.authService.register(req);
   }
 }
 <% } %>

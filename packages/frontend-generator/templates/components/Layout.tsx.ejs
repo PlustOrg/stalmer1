@@ -1,68 +1,87 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 <% if (authProvider === 'clerk') { %>
-import { UserButton } from '@clerk/clerk-react';
+import { SignedIn, SignedOut, UserButton, SignInButton, SignUpButton } from '@clerk/clerk-react';
 <% } else if (authProvider === 'auth0') { %>
 import { useAuth0 } from '@auth0/auth0-react';
+<% } else if (authProvider === 'jwt') { %>
+import { useAuth } from '../hooks/useAuth';
 <% } %>
 
-// Navigation items derived from application pages
 const navItems = [
   { to: '/dashboard', label: 'Dashboard' },
-<% pages.forEach(page => { %>
+  <% pages.forEach(page => { %>
   { to: '<%= page.route %>', label: '<%= page.name %>' },
-<% }); %>
+  <% }); %>
 ];
 
-export default function Layout() {
-<% if (authProvider === 'auth0') { %>
-  const { logout, user } = useAuth0();
-<% } %>
-
+function AuthButtons() {
+  <% if (authProvider === 'clerk') { %>
   return (
-    <div className="layout">
-      <aside className="sidebar">
-        <div className="sidebar-title"><%= app.name || 'Stalmer1 App' %></div>
-        <nav>
-          <ul className="nav-list">
-            {navItems.map((item) => (
-              <li key={item.to} className="nav-item">
-                <NavLink
-                  to={item.to}
-                  className={({isActive}) => isActive ? "nav-link active" : "nav-link"}
-                >
+    <>
+      <SignedIn>
+        <UserButton afterSignOutUrl="/"/>
+      </SignedIn>
+      <SignedOut>
+        <SignInButton mode="modal" />
+      </SignedOut>
+    </>
+  );
+  <% } else if (authProvider === 'auth0') { %>
+  const { loginWithRedirect, logout, user, isAuthenticated } = useAuth0();
+  return isAuthenticated ? (
+    <div className="flex items-center space-x-4">
+      <span>{user?.name}</span>
+      <button onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })} className="btn-secondary">Log Out</button>
+    </div>
+  ) : (
+    <button onClick={() => loginWithRedirect()} className="btn-primary">Log In</button>
+  );
+  <% } else if (authProvider === 'jwt') { %>
+  const { token, logout } = useAuth();
+  return token ? (
+    <button onClick={logout} className="btn-secondary">Log Out</button>
+  ) : (
+    <div className="space-x-2">
+      <NavLink to="/login" className="btn-primary">Log In</NavLink>
+      <NavLink to="/register" className="btn-secondary">Sign Up</NavLink>
+    </div>
+  );
+  <% } else { %>
+  return <div>No Auth</div>;
+  <% } %>
+}
+
+export default function Layout({ children }) {
+  return (
+    <div className="flex h-screen bg-gray-100">
+      {/* Sidebar */}
+      <aside className="w-64 bg-gray-800 text-white flex flex-col">
+        <div className="p-4 text-2xl font-bold border-b border-gray-700"><%= app.name %></div>
+        <nav className="flex-grow p-4">
+          <ul>
+            {navItems.map(item => (
+              <li key={item.to}>
+                <NavLink to={item.to} className={({ isActive }) => 
+                  `block py-2 px-4 rounded transition-colors ${isActive ? 'bg-gray-700' : 'hover:bg-gray-700'}`
+                }>
                   {item.label}
                 </NavLink>
               </li>
             ))}
           </ul>
         </nav>
-        <div className="user-section" style={{ marginTop: 'auto', paddingTop: '20px' }}>
-        <% if (authProvider === 'clerk') { %>
-          <UserButton afterSignOutUrl="/login" />
-        <% } else if (authProvider === 'auth0') { %>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            {user?.picture && (
-              <img 
-                src={user.picture} 
-                alt={user.name || 'User'} 
-                style={{ width: '32px', height: '32px', borderRadius: '50%', marginRight: '8px' }} 
-              />
-            )}
-            <span>{user?.name}</span>
-            <button 
-              onClick={() => logout({ logoutParams: { returnTo: window.location.origin + '/login' } })}
-              style={{ marginLeft: '8px', fontSize: '0.8rem' }}
-            >
-              Logout
-            </button>
-          </div>
-        <% } %>
-        </div>
       </aside>
-      <main className="main">
-        <Outlet />
-      </main>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        <header className="bg-white shadow p-4 flex justify-end items-center">
+          <AuthButtons />
+        </header>
+        <main className="flex-grow p-6 overflow-auto">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

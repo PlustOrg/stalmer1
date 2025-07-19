@@ -1,0 +1,23 @@
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { ValidationPipe } from '@nestjs/common';
+<% if (sentryDsn) { %>import './sentry';<% } %>
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  
+  // Enable global validation pipes
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true, // Strip away properties that don't have any decorators
+    forbidNonWhitelisted: true, // Throw an error if non-whitelisted values are provided
+    transform: true, // Automatically transform payloads to be objects typed according to their DTO classes
+  }));
+
+  // Enable CORS for all origins
+  app.enableCors();
+
+  const port = process.env.PORT || 4000;
+  await app.listen(port);
+  console.log(`Application is running on: http://localhost:${port}`);
+}
+bootstrap();

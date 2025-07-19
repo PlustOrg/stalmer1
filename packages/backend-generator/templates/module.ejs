@@ -1,1 +1,11 @@
-<%- entities.map(entity => `import { Module } from '@nestjs/common';\nimport { ${entity.name}Service } from './${entity.name.toLowerCase()}.service';\nimport { ${entity.name}Controller } from './${entity.name.toLowerCase()}.controller';\n\n@Module({\n  providers: [${entity.name}Service],\n  controllers: [${entity.name}Controller],\n})\nexport class ${entity.name}Module {}`) .join('\n\n') %>
+import { Module } from '@nestjs/common';
+import { <%= entity.name %>Controller } from './<%= entity.name.toLowerCase() %>.controller';
+import { <%= entity.name %>Service } from './<%= entity.name.toLowerCase() %>.service';
+import { PrismaModule } from '../prisma/prisma.module';
+
+@Module({
+  imports: [PrismaModule],
+  controllers: [<%= entity.name %>Controller],
+  providers: [<%= entity.name %>Service],
+})
+export class <%= entity.name %>Module {}

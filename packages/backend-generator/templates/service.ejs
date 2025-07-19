@@ -1,1 +1,47 @@
-<%- entities.map(entity => `import { Injectable } from '@nestjs/common';\n// import { PrismaService } from '../prisma.service';\n\n@Injectable()\nexport class ${entity.name}Service {\n  // constructor(private prisma: PrismaService) {}\n\n  async findAll() {\n    // return this.prisma.${entity.name.toLowerCase()}.findMany();\n    return []; // TODO: Implement\n  }\n\n  async findOne(id: string) {\n    // return this.prisma.${entity.name.toLowerCase()}.findUnique({ where: { id } });\n    return {}; // TODO: Implement\n  }\n\n  async create(data: any) {\n    // return this.prisma.${entity.name.toLowerCase()}.create({ data });\n    return {}; // TODO: Implement\n  }\n\n  async update(id: string, data: any) {\n    // return this.prisma.${entity.name.toLowerCase()}.update({ where: { id }, data });\n    return {}; // TODO: Implement\n  }\n\n  async remove(id: string) {\n    // return this.prisma.${entity.name.toLowerCase()}.delete({ where: { id } });\n    return {}; // TODO: Implement\n  }\n}`) .join('\n\n') %>
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+<% const hasPasswordField = entity.fields.some(f => f.isPassword); %>
+<% if (hasPasswordField) { %>import * as bcrypt from 'bcrypt';<% } %>
+import { <%= entity.name %> } from '@prisma/client';
+
+@Injectable()
+export class <%= entity.name %>Service {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async findAll(): Promise<<%= entity.name %>[]> {
+    return this.prisma.<%= entity.name.toLowerCase() %>.findMany();
+  }
+
+  async findOne(id: string): Promise<<%= entity.name %> | null> {
+    return this.prisma.<%= entity.name.toLowerCase() %>.findUnique({ where: { id } });
+  }
+
+  async create(data: Omit<<%= entity.name %>, 'id' | 'createdAt' | 'updatedAt'>): Promise<<%= entity.name %>> {
+    <% for (const field of entity.fields) { %>
+      <% if (field.isPassword) { %>
+    if (data.<%= field.name %>) {
+      data.<%= field.name %> = await bcrypt.hash(data.<%= field.name %>, 10);
+    }
+      <% } %>
+    <% } %>
+    return this.prisma.<%= entity.name.toLowerCase() %>.create({ data });
+  }
+
+  async update(id: string, data: Partial<Omit<<%= entity.name %>, 'id' | 'createdAt' | 'updatedAt'>>): Promise<<%= entity.name %>> {
+    <% for (const field of entity.fields) { %>
+      <% if (field.isPassword) { %>
+    if (data.<%= field.name %>) {
+      data.<%= field.name %> = await bcrypt.hash(data.<%= field.name %>, 10);
+    }
+      <% } %>
+    <% } %>
+    return this.prisma.<%= entity.name.toLowerCase() %>.update({
+      where: { id },
+      data,
+    });
+  }
+
+  async remove(id: string): Promise<<%= entity.name %>> {
+    return this.prisma.<%= entity.name.toLowerCase() %>.delete({ where: { id } });
+  }
+}

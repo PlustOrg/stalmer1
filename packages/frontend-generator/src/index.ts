@@ -2,6 +2,7 @@ import { IApp } from '@stalmer1/core';
 import ejs from 'ejs';
 import * as fs from 'fs';
 import * as path from 'path';
+import { generateUiComponents } from './components';
 
 export async function generateFrontend(app: IApp, outDir: string) {
   const templatesDir = path.join(__dirname, '..', 'templates');
@@ -12,7 +13,7 @@ export async function generateFrontend(app: IApp, outDir: string) {
   const clerkPublishableKey = app.config?.auth?.props?.clerkPublishableKey;
   const auth0Domain = app.config?.auth?.props?.auth0Domain;
   const auth0ClientId = app.config?.auth?.props?.auth0ClientId;
-  const backendPort = 3000; // Default port for backend
+  const backendPort = 4000; // Default port for backend
   
   // Create directory structure
   fs.mkdirSync(path.join(outDir, 'src'), { recursive: true });
@@ -22,6 +23,9 @@ export async function generateFrontend(app: IApp, outDir: string) {
   fs.mkdirSync(path.join(outDir, 'src/components/details'), { recursive: true });
   fs.mkdirSync(path.join(outDir, 'src/hooks'), { recursive: true });
   fs.mkdirSync(path.join(outDir, 'src/styles'), { recursive: true });
+
+  // Generate UI components
+  generateUiComponents(outDir);
 
   // Generate the base HTML file
   const htmlTemplate = fs.readFileSync(path.join(templatesDir, 'index.html.ejs'), 'utf-8');
@@ -72,6 +76,13 @@ export async function generateFrontend(app: IApp, outDir: string) {
     ejs.render(layoutTemplate, { app, pages, authProvider })
   );
 
+  // Generate App.tsx
+  const appTemplate = fs.readFileSync(path.join(templatesDir, 'App.tsx.ejs'), 'utf-8');
+  fs.writeFileSync(
+    path.join(outDir, 'src/App.tsx'),
+    ejs.render(appTemplate, { pages, authProvider })
+  );
+
   // Generate Table components
   const tableTemplate = fs.readFileSync(path.join(templatesDir, 'Table.tsx.ejs'), 'utf-8');
   const tablePages = pages.filter(p => p.type === 'table');
@@ -110,13 +121,6 @@ export async function generateFrontend(app: IApp, outDir: string) {
       );
     });
   }
-
-  // Generate App component
-  const appTemplate = fs.readFileSync(path.join(templatesDir, 'App.tsx.ejs'), 'utf-8');
-  fs.writeFileSync(
-    path.join(outDir, 'src/App.tsx'),
-    ejs.render(appTemplate, { pages, authProvider, sentryDsn })
-  );
   
   // Generate auth and monitoring setup files
   if (authProvider === 'clerk') {
