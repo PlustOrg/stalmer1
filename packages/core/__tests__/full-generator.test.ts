@@ -92,7 +92,7 @@ jest.mock('@stalmer1/backend-generator', () => ({
     
     return Promise.resolve();
   }),
-  generateDockerFiles: jest.fn().mockImplementation((outDir) => {
+  generateDockerFiles: jest.fn().mockImplementation((app, outDir) => {
     // Create a sample docker-compose.yml file
     const dockerCompose = `# Mock docker-compose.yml for testing
 version: '3'
@@ -136,7 +136,7 @@ export async function testFullGeneration(app: IApp, outDir: string) {
   try {
     await backendGen.generateBackend(app, path.join(outDir, 'backend'));
     await frontendGen.generateFrontend(app, path.join(outDir, 'frontend'));
-    await backendGen.generateDockerFiles(outDir, app.config?.db || 'sqlite');
+    await backendGen.generateDockerFiles(app, outDir, app.config?.db || 'sqlite');
     return path.join(outDir, 'backend');
   } finally {
     if (originalTemplatesDir) {
