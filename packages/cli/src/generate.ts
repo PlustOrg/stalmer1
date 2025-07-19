@@ -105,6 +105,7 @@ export const generateCommand = new Command('generate')
   .option('--clean', 'Perform a clean build, removing all existing generated files.')
   .option('--skip-migrations', 'Skip running database migrations after code generation.')
   .option('--migrations-only', 'Only run database migrations without generating code.')
+  .option('--verbose', 'Enable verbose logging', false)
   .action(async (options) => {
     const cwd = process.cwd();
     const schemaPath = path.join(cwd, 'schema.dsl');
@@ -145,7 +146,7 @@ export const generateCommand = new Command('generate')
       }
 
       console.log(`Generating application code to: ${outDir}`);
-      await generateFullProject(ir, outDir);
+      await generateFullProject(ir, outDir, options.verbose);
       console.log('Code generation complete.');
       
       // Run database migrations unless skipped

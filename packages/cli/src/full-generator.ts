@@ -10,9 +10,10 @@ import * as fs from 'fs';
  * Generates the complete project based on the application IR
  * @param app - The application IR
  * @param outDir - The output directory for the generated files
+ * @param verbose - Enable verbose logging
  * @returns A promise that resolves when the generation is complete
  */
-export async function generateFullProject(app: IApp, outDir: string) {
+export async function generateFullProject(app: IApp, outDir: string, verbose: boolean = false) {
   // Create output directory if it doesn't exist
   if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true });
@@ -20,11 +21,11 @@ export async function generateFullProject(app: IApp, outDir: string) {
   
   // Generate backend code
   console.log('Generating backend code...');
-  await generateBackend(app, path.join(outDir, 'backend'));
+  await generateBackend(app, path.join(outDir, 'backend'), verbose);
   
   // Generate frontend code
   console.log('Generating frontend code...');
-  await generateFrontend(app, path.join(outDir, 'frontend'));
+  await generateFrontend(app, path.join(outDir, 'frontend'), verbose);
   
   // Generate Docker files
   console.log('Generating Docker files...');

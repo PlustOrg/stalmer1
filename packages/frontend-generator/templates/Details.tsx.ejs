@@ -1,4 +1,4 @@
-<%- pages.filter(page => page.type === 'details').map(page => {
+<% pages.filter(page => page.type === 'details').map(page => {
   const entityName = page.entity || 'Item';
   const endpoint = page.entity ? page.entity.toLowerCase() + 's' : 'items';
   

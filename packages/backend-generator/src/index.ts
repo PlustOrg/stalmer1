@@ -41,7 +41,7 @@ function addDependencyToPackageJson(outDir: string, packageName: string, version
 // Re-export generateDockerFiles function
 export { generateDockerFiles } from './docker';
 
-export async function generateBackend(app: IApp, outDir: string) {
+export async function generateBackend(app: IApp, outDir: string, verbose: boolean = false) {
   // Get database type from app config or default to sqlite
   const dbType = app.config?.db === 'postgresql' ? 'postgresql' : 'sqlite';
   
@@ -79,18 +79,26 @@ export async function generateBackend(app: IApp, outDir: string) {
     const entityDir = path.join(outDir, 'src', entity.name.toLowerCase());
     fs.mkdirSync(entityDir, { recursive: true });
 
+    const moduleContent = ejs.render(moduleTemplate, { entity });
     fs.writeFileSync(
       path.join(entityDir, `${entity.name.toLowerCase()}.module.ts`),
-      ejs.render(moduleTemplate, { entity })
+      moduleContent
     );
+    if (verbose) console.log(`Generated ${entity.name.toLowerCase()}.module.ts`);
+
+    const controllerContent = ejs.render(controllerTemplate, { entity, rbac, permissions, authProvider });
     fs.writeFileSync(
       path.join(entityDir, `${entity.name.toLowerCase()}.controller.ts`),
-      ejs.render(controllerTemplate, { entity, rbac, permissions, authProvider })
+      controllerContent
     );
+    if (verbose) console.log(`Generated ${entity.name.toLowerCase()}.controller.ts`);
+
+    const serviceContent = ejs.render(serviceTemplate, { entity });
     fs.writeFileSync(
       path.join(entityDir, `${entity.name.toLowerCase()}.service.ts`),
-      ejs.render(serviceTemplate, { entity })
+      serviceContent
     );
+    if (verbose) console.log(`Generated ${entity.name.toLowerCase()}.service.ts`);
   }
   
   // Generate auth services
@@ -99,138 +107,187 @@ export async function generateBackend(app: IApp, outDir: string) {
       path.join(outDir, 'src/rbac.guard.ts'), 
       ejs.render(rbacGuardTemplate, { authProvider })
     );
-  }
-  
-  // Auth strategy implementation
-  if (authProvider) {
-    const authDir = path.join(outDir, 'src/auth');
-    fs.mkdirSync(authDir, { recursive: true });
+    if (verbose) console.log('Generated rbac.guard.ts');
+
+    const authModuleDir = path.join(outDir, 'src/auth');
+    fs.mkdirSync(authModuleDir, { recursive: true });
 
     const authModuleTemplate = fs.readFileSync(path.join(templatesDir, 'auth/auth.module.ejs'), 'utf-8');
     fs.writeFileSync(
-      path.join(authDir, 'auth.module.ts'),
+      path.join(authModuleDir, 'auth.module.ts'),
       ejs.render(authModuleTemplate, { authProvider })
     );
-  }
+    if (verbose) console.log('Generated auth.module.ts');
 
-  if (authProvider === 'clerk') {
-    const clerkAuthTemplate = fs.readFileSync(path.join(templatesDir, 'auth-clerk.ts.ejs'), 'utf-8');
-    fs.writeFileSync(
-      path.join(outDir, 'src/auth/clerk.strategy.ts'),
-      ejs.render(clerkAuthTemplate)
-    );
-  } else if (authProvider === 'auth0') {
-    const auth0AuthTemplate = fs.readFileSync(path.join(templatesDir, 'auth-auth0.ts.ejs'), 'utf-8');
-    fs.writeFileSync(
-      path.join(outDir, 'src/auth/auth0.strategy.ts'),
-      ejs.render(auth0AuthTemplate)
-    );
-  } else if (authProvider === 'jwt') {
-    const jwtAuthTemplate = fs.readFileSync(path.join(templatesDir, 'auth-jwt.ts.ejs'), 'utf-8');
-    fs.writeFileSync(
-      path.join(outDir, 'src/auth/jwt.strategy.ts'),
-      ejs.render(jwtAuthTemplate)
-    );
-  }
-
-  // Add dependencies to package.json
-  addDependencyToPackageJson(outDir, '@nestjs/common', '^10.0.0');
-  addDependencyToPackageJson(outDir, '@nestjs/core', '^10.0.0');
-  addDependencyToPackageJson(outDir, '@nestjs/platform-express', '^10.0.0');
-  addDependencyToPackageJson(outDir, 'reflect-metadata', '^0.1.13');
-  addDependencyToPackageJson(outDir, 'rxjs', '^7.0.0');
-  addDependencyToPackageJson(outDir, 'class-validator', '^0.14.0');
-  addDependencyToPackageJson(outDir, 'class-transformer', '^0.5.1');
-  
-  if (authProvider) {
-    addDependencyToPackageJson(outDir, '@nestjs/passport', '^10.0.0');
-    addDependencyToPackageJson(outDir, 'passport', '^0.6.0');
-  }
-  if (authProvider === 'jwt') {
-    addDependencyToPackageJson(outDir, '@nestjs/jwt', '^10.0.0');
-    addDependencyToPackageJson(outDir, 'passport-jwt', '^4.0.1');
-    addDependencyToPackageJson(outDir, '@types/passport-jwt', '^3.0.8', true);
-    addDependencyToPackageJson(outDir, 'bcrypt', '^5.1.0');
-    addDependencyToPackageJson(outDir, '@types/bcrypt', '^5.0.0', true);
-  }
-  if (authProvider === 'auth0') {
-    addDependencyToPackageJson(outDir, 'passport-auth0', '^1.4.3');
-  }
-  if (authProvider === 'clerk') {
-    addDependencyToPackageJson(outDir, '@clerk/clerk-sdk-node', '^4.13.6');
-  }
-
-  // Sentry integration
-  if (sentryDsn) {
-    const sentryCode = `// Sentry integration\nimport * as Sentry from '@sentry/node';\nSentry.init({ dsn: '${sentryDsn}' });`;
-    fs.writeFileSync(path.join(outDir, 'src/sentry.ts'), sentryCode);
-  }
-  // SendGrid integration and workflow registry
-  if (app.config?.integrations?.email?.provider === 'sendgrid') {
-    const sendgridCode = `// SendGrid integration\nimport sgMail from '@sendgrid/mail';\nsgMail.setApiKey(process.env.SENDGRID_API_KEY!);\nexport async function sendEmail({ to, subject, text, html }: any) {\n  await sgMail.send({ to, from: '${app.config.integrations.email.defaultFrom}', subject, text, html });\n}`;
-    fs.writeFileSync(path.join(outDir, 'src/sendgrid.ts'), sendgridCode);
-  }
-  // Workflow registry
-  if (app.workflows && app.workflows.length > 0) {
-    let registry = `// Workflow Registry\n`;
-    registry += `const builtInActions = {\n`;
-    if (app.config?.integrations?.email?.provider === 'sendgrid') {
-      registry += `  sendEmail: require('./sendgrid').sendEmail,\n`;
+    if (authProvider === 'jwt') {
+      const jwtAuthTemplate = fs.readFileSync(path.join(templatesDir, 'auth-jwt.ts.ejs'), 'utf-8');
+      fs.writeFileSync(
+        path.join(authModuleDir, 'jwt.strategy.ts'),
+        ejs.render(jwtAuthTemplate)
+      );
+      if (verbose) console.log('Generated jwt.strategy.ts');
+    } else if (authProvider === 'clerk') {
+      const clerkAuthTemplate = fs.readFileSync(path.join(templatesDir, 'auth-clerk.ts.ejs'), 'utf-8');
+      fs.writeFileSync(
+        path.join(authModuleDir, 'clerk.strategy.ts'),
+        ejs.render(clerkAuthTemplate)
+      );
+      if (verbose) console.log('Generated clerk.strategy.ts');
+    } else if (authProvider === 'auth0') {
+      const auth0AuthTemplate = fs.readFileSync(path.join(templatesDir, 'auth-auth0.ts.ejs'), 'utf-8');
+      fs.writeFileSync(
+        path.join(authModuleDir, 'auth0.strategy.ts'),
+        ejs.render(auth0AuthTemplate)
+      );
+      if (verbose) console.log('Generated auth0.strategy.ts');
     }
-    // Add more built-in actions as needed
-    registry += `};\n`;
-    registry += `\nexport async function executeWorkflow(name, context) {\n`;
-    registry += `  // This is a simple dispatcher. In production, add error handling, async steps, etc.\n`;
-    registry += `  const wf = workflows.find(w => w.name === name);\n`;
-    registry += `  if (!wf) throw new Error('Workflow not found: ' + name);\n`;
-    registry += `  for (const step of wf.steps || []) {\n`;
-    registry += `    const action = builtInActions[step.action];\n`;
-    registry += `    if (action) await action(step.inputs);\n`;
-    registry += `    // TODO: Add support for custom/user actions\n`;
-    registry += `  }\n`;
-    registry += `}\n`;
-    registry += `\nexport const workflows = ${JSON.stringify(app.workflows, null, 2)};\n`;
-    fs.writeFileSync(path.join(outDir, 'src/workflow.registry.ts'), registry);
   }
 
-  // Generate main app files
-  const mainTemplate = fs.readFileSync(path.join(templatesDir, 'main.ts.ejs'), 'utf-8');
-  fs.writeFileSync(
-    path.join(outDir, 'src/main.ts'),
-    ejs.render(mainTemplate, { sentryDsn })
-  );
-
+  // Generate main app module, controller, service
   const appModuleTemplate = fs.readFileSync(path.join(templatesDir, 'app.module.ejs'), 'utf-8');
   fs.writeFileSync(
     path.join(outDir, 'src/app.module.ts'),
-    ejs.render(appModuleTemplate, { entities, authProvider })
+    ejs.render(appModuleTemplate, { entities, authProvider, rbac, sentryDsn })
   );
+  if (verbose) console.log('Generated app.module.ts');
 
   const appControllerTemplate = fs.readFileSync(path.join(templatesDir, 'app.controller.ejs'), 'utf-8');
   fs.writeFileSync(
     path.join(outDir, 'src/app.controller.ts'),
     ejs.render(appControllerTemplate)
   );
+  if (verbose) console.log('Generated app.controller.ts');
 
   const appServiceTemplate = fs.readFileSync(path.join(templatesDir, 'app.service.ejs'), 'utf-8');
   fs.writeFileSync(
     path.join(outDir, 'src/app.service.ts'),
     ejs.render(appServiceTemplate)
   );
+  if (verbose) console.log('Generated app.service.ts');
+
+  // Generate main.ts
+  const mainTemplate = fs.readFileSync(path.join(templatesDir, 'main.ts.ejs'), 'utf-8');
+  fs.writeFileSync(
+    path.join(outDir, 'src/main.ts'),
+    ejs.render(mainTemplate, { sentryDsn })
+  );
+  if (verbose) console.log('Generated main.ts');
 
   // Generate Prisma module and service
-  const prismaDir = path.join(outDir, 'src/prisma');
-  fs.mkdirSync(prismaDir, { recursive: true });
-
   const prismaModuleTemplate = fs.readFileSync(path.join(templatesDir, 'prisma.module.ejs'), 'utf-8');
   fs.writeFileSync(
-    path.join(prismaDir, 'prisma.module.ts'),
+    path.join(outDir, 'src/prisma.module.ts'),
     ejs.render(prismaModuleTemplate)
   );
+  if (verbose) console.log('Generated prisma.module.ts');
 
   const prismaServiceTemplate = fs.readFileSync(path.join(templatesDir, 'prisma.service.ejs'), 'utf-8');
   fs.writeFileSync(
-    path.join(prismaDir, 'prisma.service.ts'),
+    path.join(outDir, 'src/prisma.service.ts'),
     ejs.render(prismaServiceTemplate)
   );
+  if (verbose) console.log('Generated prisma.service.ts');
+
+  // Generate package.json
+  const packageJsonTemplate = {
+    "name": path.basename(outDir),
+    "version": "0.1.0",
+    "scripts": {
+      "start": "node dist/main.js",
+      "build": "tsc",
+      "watch": "tsc -w",
+      "test": "jest",
+      "test:watch": "jest --watch",
+      "test:cov": "jest --coverage",
+      "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+      "test:e2e": "jest --config ./test/jest-e2e.json"
+    },
+    "dependencies": {
+      "@nestjs/common": "^9.0.0",
+      "@nestjs/core": "^9.0.0",
+      "@nestjs/platform-express": "^9.0.0",
+      "reflect-metadata": "^0.1.13",
+      "rxjs": "^7.2.0",
+      "@prisma/client": "4.15.0"
+    },
+    "devDependencies": {
+      "@nestjs/testing": "^9.0.0",
+      "jest": "^27.0.0",
+      "ts-jest": "^27.0.0",
+      "supertest": "^6.0.0",
+      "prisma": "4.15.0",
+      "@types/jest": "^27.0.0",
+      "@types/supertest": "^2.0.0",
+      "typescript": "^4.7.4",
+      "ts-loader": "^9.2.3",
+      "ts-node": "^10.0.0",
+      "tsconfig-paths": "4.2.0"
+    },
+    "jest": {
+      "moduleFileExtensions": [
+        "js",
+        "json",
+        "ts"
+      ],
+      "rootDir": "src",
+      "testRegex": ".*\\.spec\\.ts$",
+      "transform": {
+        "^.+\\.(t|j)s$": "ts-jest"
+      },
+      "collectCoverageFrom": [
+        "**/*.(t|j)s"
+      ],
+      "coverageDirectory": "../coverage",
+      "testEnvironment": "node"
+    }
+  };
+  fs.writeFileSync(path.join(outDir, 'package.json'), JSON.stringify(packageJsonTemplate, null, 2));
+  if (verbose) console.log('Generated package.json');
+
+  // Add auth dependencies
+  if (authProvider === 'jwt') {
+    addDependencyToPackageJson(outDir, '@nestjs/jwt', '^9.0.0');
+    addDependencyToPackageJson(outDir, '@nestjs/passport', '^9.0.0');
+    addDependencyToPackageJson(outDir, 'passport', '^0.6.0');
+    addDependencyToPackageJson(outDir, 'passport-jwt', '^4.0.0');
+    addDependencyToPackageJson(outDir, '@types/passport-jwt', '^3.0.6', true);
+  } else if (authProvider === 'clerk') {
+    addDependencyToPackageJson(outDir, '@clerk/clerk-sdk-node', '^4.0.0');
+  } else if (authProvider === 'auth0') {
+    addDependencyToPackageJson(outDir, 'passport-auth0', '^1.4.2');
+    addDependencyToPackageJson(outDir, '@types/passport-auth0', '^1.0.5', true);
+  }
+
+  // Add Sentry dependency
+  if (sentryDsn) {
+    addDependencyToPackageJson(outDir, '@sentry/node', '^7.0.0');
+    addDependencyToPackageJson(outDir, '@sentry/tracing', '^7.0.0');
+  }
+
+  // Add Prisma dev dependency
+  addDependencyToPackageJson(outDir, 'prisma', '4.15.0', true);
+
+  // Generate tsconfig.json
+  const tsconfigTemplate = {
+    "compilerOptions": {
+      "module": "commonjs",
+      "target": "es2017",
+      "lib": [
+        "es2017",
+        "dom"
+      ],
+      "sourceMap": true,
+      "outDir": "./dist",
+      "baseUrl": "./",
+      "incremental": true,
+      "skipLibCheck": true,
+      "strictNullChecks": false,
+      "noImplicitAny": false,
+      "strictBindCallApply": false,
+      "forceConsistentCasingInFileNames": false,
+      "noFallthroughCasesInSwitch": false
+    }
+  };
+  fs.writeFileSync(path.join(outDir, 'tsconfig.json'), JSON.stringify(tsconfigTemplate, null, 2));
+  if (verbose) console.log('Generated tsconfig.json');
 }

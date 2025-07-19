@@ -1,4 +1,4 @@
-<%- pages.filter(page => page.type === 'form').map(page => {
+<% pages.filter(page => page.type === 'form').map(page => {
   const entityName = page.entity || 'Item';
   const endpoint = page.entity ? page.entity.toLowerCase() + 's' : 'items';
   
@@ -60,4 +60,4 @@ export default function <%= pages[0].name %>Form() {
     </Card>
   );
 }`;
-}).join('\n\n') %}
+}).join('\n\n') %>
