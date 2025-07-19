@@ -10,9 +10,9 @@ import { useAuth } from './hooks/useAuth';
 import Layout from './components/Layout';
 
 <% pages.forEach(page => { %>
-import <%= page.name %>Table from "<%= page.name %>Table"
-import <%= page.name %>Form from "<%= page.name %>Form"
-import <%= page.name %>Details from "<%= page.name %>Details"
+import <%= page.name %>Table from "./<%= page.name %>Table"
+import <%= page.name %>Form from "./<%= page.name %>Form"
+import <%= page.name %>Details from "./<%= page.name %>Details"
 <% }) %>
 
 // A wrapper for routes that require authentication and authorization.

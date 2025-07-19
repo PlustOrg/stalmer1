@@ -104,7 +104,7 @@ export async function generateFrontend(app: IApp, outDir: string, verbose: boole
   
   if (tablePages.length > 0) {
     tablePages.forEach(page => {
-      const tableContent = ejs.render(tableTemplate, { pages: [page] });
+      const tableContent = ejs.render(tableTemplate, { page: page });
       fs.writeFileSync(
         path.join(outDir, `src/components/tables/${page.name}Table.tsx`),
         tableContent
@@ -119,7 +119,7 @@ export async function generateFrontend(app: IApp, outDir: string, verbose: boole
   
   if (formPages.length > 0) {
     formPages.forEach(page => {
-      const formContent = ejs.render(formTemplate, { pages: [page] });
+      const formContent = ejs.render(formTemplate, { page: page });
       fs.writeFileSync(
         path.join(outDir, `src/components/forms/${page.name}Form.tsx`),
         formContent
@@ -134,7 +134,7 @@ export async function generateFrontend(app: IApp, outDir: string, verbose: boole
   
   if (detailsPages.length > 0) {
     detailsPages.forEach(page => {
-      const detailsContent = ejs.render(detailsTemplate, { pages: [page] });
+      const detailsContent = ejs.render(detailsTemplate, { page: page });
       fs.writeFileSync(
         path.join(outDir, `src/components/details/${page.name}Details.tsx`),
         detailsContent
