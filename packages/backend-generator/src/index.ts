@@ -285,7 +285,10 @@ export async function generateBackend(app: IApp, outDir: string, verbose: boolea
       "noImplicitAny": false,
       "strictBindCallApply": false,
       "forceConsistentCasingInFileNames": false,
-      "noFallthroughCasesInSwitch": false
+      "noFallthroughCasesInSwitch": false,
+      "experimentalDecorators": true,
+      "emitDecoratorMetadata": true,
+      "useDefineForClassFields": false
     }
   };
   fs.writeFileSync(path.join(outDir, 'tsconfig.json'), JSON.stringify(tsconfigTemplate, null, 2));
