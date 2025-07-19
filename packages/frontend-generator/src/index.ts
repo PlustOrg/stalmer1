@@ -15,6 +15,11 @@ export async function generateFrontend(app: IApp, outDir: string, verbose: boole
   const auth0ClientId = app.config?.auth?.props?.auth0ClientId;
   const backendPort = 4000; // Default port for backend
   
+  const hydratedPages = pages.map(page => ({
+    ...page,
+    entity: app.entities.find(e => e.name === page.entity)
+  }));
+  
   // Create directory structure
   fs.mkdirSync(path.join(outDir, 'src'), { recursive: true });
   fs.mkdirSync(path.join(outDir, 'src/components'), { recursive: true });
@@ -82,7 +87,7 @@ export async function generateFrontend(app: IApp, outDir: string, verbose: boole
   
   // Generate Layout component
   const layoutTemplate = fs.readFileSync(path.join(templatesDir, 'components/Layout.tsx.ejs'), 'utf-8');
-  const layoutContent = ejs.render(layoutTemplate, { app, pages, authProvider });
+  const layoutContent = ejs.render(layoutTemplate, { app, pages: hydratedPages, authProvider });
   fs.writeFileSync(
     path.join(outDir, 'src/components/Layout.tsx'),
     layoutContent
@@ -91,7 +96,7 @@ export async function generateFrontend(app: IApp, outDir: string, verbose: boole
 
   // Generate App.tsx
   const appTemplate = fs.readFileSync(path.join(templatesDir, 'App.tsx.ejs'), 'utf-8');
-  const appContent = ejs.render(appTemplate, { pages, authProvider });
+  const appContent = ejs.render(appTemplate, { pages: hydratedPages, authProvider });
   fs.writeFileSync(
     path.join(outDir, 'src/App.tsx'),
     appContent
@@ -100,7 +105,7 @@ export async function generateFrontend(app: IApp, outDir: string, verbose: boole
 
   // Generate Table components
   const tableTemplate = fs.readFileSync(path.join(templatesDir, 'Table.tsx.ejs'), 'utf-8');
-  const tablePages = pages.filter(p => p.type === 'table');
+  const tablePages = hydratedPages.filter(p => p.type === 'table');
   
   if (tablePages.length > 0) {
     tablePages.forEach(page => {
@@ -115,7 +120,7 @@ export async function generateFrontend(app: IApp, outDir: string, verbose: boole
 
   // Generate Form components
   const formTemplate = fs.readFileSync(path.join(templatesDir, 'Form.tsx.ejs'), 'utf-8');
-  const formPages = pages.filter(p => p.type === 'form');
+  const formPages = hydratedPages.filter(p => p.type === 'form');
   
   if (formPages.length > 0) {
     formPages.forEach(page => {
@@ -130,7 +135,7 @@ export async function generateFrontend(app: IApp, outDir: string, verbose: boole
 
   // Generate Details components
   const detailsTemplate = fs.readFileSync(path.join(templatesDir, 'Details.tsx.ejs'), 'utf-8');
-  const detailsPages = pages.filter(p => p.type === 'details');
+  const detailsPages = hydratedPages.filter(p => p.type === 'details');
   
   if (detailsPages.length > 0) {
     detailsPages.forEach(page => {

@@ -84,6 +84,7 @@ describe('DSL Parser - Edge Cases', () => {
       entity Dummy {} 
       page ComplexPage {
         type: form
+        entity: Dummy
         route: "/complex"
         props: {
           setting1: "value1"

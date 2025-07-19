@@ -305,12 +305,59 @@ export function parseDSL(dsl: string): IApp {
         [block, endIndex] = parseBlock(lines, i + 1);
         switch (type) {
           case 'page': {
-            const page = { 
-              name,
-              ...block,
-              type: block.type || 'table',
-              route: block.route || '/'
-            } as IRPage;
+            const pageName = name;
+            
+            const page: IRPage = {
+              name: pageName,
+              type: 'table', // default
+              entity: '', // must be provided
+              route: `/${pageName.toLowerCase()}`,
+            };
+
+            for (const [key, value] of Object.entries(block)) {
+                switch(key) {
+                    case 'type':
+                        page.type = value as IRPage['type'];
+                        break;
+                    case 'entity':
+                        page.entity = value as string;
+                        break;
+                    case 'route':
+                        page.route = value as string;
+                        break;
+                    case 'permissions':
+                        if (typeof value === 'string') {
+                            page.permissions = value.split(',').map(p => p.trim());
+                        } else {
+                            page.permissions = value as string[];
+                        }
+                        break;
+                    case 'title':
+                        page.title = value as string;
+                        break;
+                    case 'columns':
+                        if (typeof value === 'string') {
+                            page.columns = value.split(',').map(c => {
+                                const [field, label] = c.trim().split(':');
+                                return { field, label: label.trim() };
+                            });
+                        } else {
+                            page.columns = value as Array<{ field: string; label: string }>;
+                        }
+                        break;
+                    case 'props':
+                        page.props = value as IRPage['props'];
+                        break;
+                }
+            }
+
+            if (!page.entity) {
+              // Allow custom pages to not have an entity
+              if (page.type !== 'custom') {
+                throw new Error(`Page '${pageName}' of type '${page.type}' must have an 'entity' property.`);
+              }
+            }
+            
             app.pages.push(page);
             break;
           }
