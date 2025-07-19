@@ -1,6 +1,6 @@
 {
   "name": "@stalmer1/frontend-generator",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "React and Vite frontend generator for Stalmer1",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "ejs": "^3.1.10",
-    "@stalmer1/core": "^0.1.9"
+    "@stalmer1/core": "^0.1.10"
   },
   "devDependencies": {
     "@types/ejs": "^3.1.5",

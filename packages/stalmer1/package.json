@@ -1,6 +1,6 @@
 {
   "name": "stalmer1",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Stalmer1: DSL-driven full-stack web-app generator",
   "main": "dist/index.js",
   "bin": {
@@ -17,7 +17,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "@stalmer1/cli": "^0.1.9"
+    "@stalmer1/cli": "^0.1.10"
   },
   "repository": {
     "type": "git",
