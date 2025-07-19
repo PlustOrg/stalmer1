@@ -10,14 +10,10 @@ import { useAuth } from './hooks/useAuth';
 import Layout from './components/Layout';
 
 <% pages.forEach(page => { %>
-  <% if (page.type === 'table') { %>
-import <%= page.name %>Table from './pages/<%= page.name %>Table';
-  <% } else if (page.type === 'form') { %>
-import <%= page.name %>Form from './pages/<%= page.name %>Form';
-  <% } else if (page.type === 'details') { %>
-import <%= page.name %>Details from './pages/<%= page.name %>Details';
-  <% } %>
-<% }); %>
+import <%= page.name %>Table from "<%= page.name %>Table"
+import <%= page.name %>Form from "<%= page.name %>Form"
+import <%= page.name %>Details from "<%= page.name %>Details"
+<% }) %>
 
 // A wrapper for routes that require authentication and authorization.
 function ProtectedRoute({ permissions = [] }) {
@@ -57,10 +53,19 @@ function ProtectedRoute({ permissions = [] }) {
 }
 
 export function App() {
+  // Example auth logic
+  <% if (authProvider === 'clerk') { %>
+  const { isSignedIn } = useAuth();
+  <% } else if (authProvider === 'auth0') { %>
+  const { isAuthenticated } = useAuth0();
+  <% } else if (authProvider === 'jwt') { %>
+  const { user } = useAuth();
+  <% } %>
+
   return (
     <Router>
-      <Routes>
-        <Route element={<Layout />}>
+      <Layout>
+        <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<div>Dashboard Content</div>} />
           
@@ -74,8 +79,9 @@ export function App() {
           {/* Auth-related routes */}
           <Route path="/login" element={<div>Login Page</div>} />
           <Route path="/unauthorized" element={<div>Unauthorized Page</div>} />
-        </Route>
-      </Routes>
+          <Route path="*" element={<Navigate to="/dashboard" />} />
+        </Routes>
+      </Layout>
     </Router>
   );
 }

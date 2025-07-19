@@ -21,25 +21,15 @@
     "clsx": "^2.0.0",
     "tailwind-merge": "^1.14.0",
     "tailwindcss-animate": "^1.0.6"
-    <% if (authProvider === 'clerk') { %>
-    ,
-    "@clerk/clerk-react": "^4.23.2"
-    <% } else if (authProvider === 'auth0') { %>
-    ,
-    "@auth0/auth0-react": "^2.2.1"
-    <% } %><% if (sentryDsn) { %>
-    ,
-    "@sentry/react": "^7.80.0"
-    <% } %>
   },
   "devDependencies": {
-    "@types/react": "^18.2.15",
-    "@types/react-dom": "^18.2.7",
-    "@vitejs/plugin-react": "^4.0.3",
-    "typescript": "^5.0.2",
-    "vite": "^4.4.5",
-    "tailwindcss": "^3.3.3",
-    "postcss": "^8.4.27",
-    "autoprefixer": "^10.4.14"
+    "@vitejs/plugin-react": "^4.0.0",
+    "typescript": "^5.0.0",
+    "eslint": "^8.0.0",
+    "vite": "^4.0.0",
+    "tailwindcss": "^3.0.0",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38"
+    // Tip: Keep dependencies up-to-date for best results
   }
 }

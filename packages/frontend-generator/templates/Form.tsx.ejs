@@ -45,12 +45,10 @@ export function <%= page.name %>Form() {
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="grid w-full items-center gap-4">
             <% for (const field of page.entity.fields) { %>
-              <% if (field.name !== 'id' && !field.isPassword) { %>
+              <% if (field.name !== 'id') { %>
             <div className="flex flex-col space-y-1.5" key="<%= field.name %>">
               <Label htmlFor="<%= field.name %>"><%= field.name %></Label>
               <Input
-                id="<%= field.name %>"
-                type="<%= field.isPassword ? 'password' : 'text' %>"
                 {...register("<%= field.name %>", { required: true })}
               />
               {errors["<%= field.name %>"] && (

@@ -1,6 +1,11 @@
 # Dockerfile for frontend (React + Vite)
 FROM node:20-alpine
 WORKDIR /app
+# Use Docker layer caching for dependencies
+COPY package*.json ./
+RUN npm install
 COPY . .
-RUN npm install && npm run build
+# Build the app
+RUN npm run build
+# For production, use a static server like Nginx. 'npm run preview' is for development only.
 CMD ["npm", "run", "preview"]

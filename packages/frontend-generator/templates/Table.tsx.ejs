@@ -14,18 +14,19 @@ import {
 } from "@/components/ui/card";
 import {
   DropdownMenu,
+  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
   TableHeader,
+  TableBody,
+  TableFooter,
   TableRow,
+  TableHead,
+  TableCell,
 } from "@/components/ui/table";
 
 <%
@@ -43,10 +44,7 @@ const delete<%= entityName %> = async (id: string) => {
 
 export function <%= page.name %>Table() {
   const queryClient = useQueryClient();
-  const { data, isLoading, error } = useQuery(
-    '<%= entityName.toLowerCase() %>s',
-    fetch<%= entityName %>s
-  );
+  const { data, error, isLoading } = useQuery(['<%= entityName.toLowerCase() %>s'], fetch<%= entityName %>s);
   const mutation = useMutation(delete<%= entityName %>, {
     onSuccess: () => {
       queryClient.invalidateQueries('<%= entityName.toLowerCase() %>s');
@@ -54,61 +52,49 @@ export function <%= page.name %>Table() {
   });
 
   if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>Error loading data</div>;
+  if (error) return <div className="text-red-500">Error loading table.</div>;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>
-          <%= page.title || entityName + 's' %>
-        </CardTitle>
-        <CardDescription>
-          Manage your <%= entityName.toLowerCase() %>s.
-        </CardDescription>
+        <CardTitle><%= entityName %>s</CardTitle>
+        <CardDescription>List of <%= entityName.toLowerCase() %>s</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <% for (const field of page.entity.fields) { %>
-                <% if (field.name !== 'id' && !field.isPassword) { %>
-              <TableHead key="<%= field.name %>"><%= field.name %></TableHead>
-                <% } %>
-              <% } %>
-              <TableHead>
-                <span className="sr-only">Actions</span>
-              </TableHead>
+              <% page.entity.fields.forEach(field => { %>
+              <TableHead><%= field.name %></TableHead>
+              <% }) %>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data && data.map((item: any) => (
+            {data.map((item) => (
               <TableRow key={item.id}>
-                <% for (const field of page.entity.fields) { %>
-                  <% if (field.name !== 'id' && !field.isPassword) { %>
-                <TableCell key="<%= field.name %>">{item["<%= field.name %>"]}</TableCell>
-                  <% } %>
-                <% } %>
+                {/* Render fields */}
+                <% page.entity.fields.forEach(field => { %>
+                <TableCell>{item.<%= field.name %>}</TableCell>
+                <% }) %>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button
-                        aria-haspopup="true"
-                        size="icon"
-                        variant="ghost"
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Toggle menu</span>
+                      <Button variant="ghost" size="icon">
+                        <MoreHorizontal size={20} />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent>
                       <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem>
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Edit
+                      <DropdownMenuItem asChild>
+                        <Button variant="outline" size="sm">
+                          <Pencil size={16} /> Edit
+                        </Button>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => mutation.mutate(item.id)}>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
+                      <DropdownMenuItem asChild>
+                        <Button variant="destructive" size="sm" onClick={() => mutation.mutate(item.id)}>
+                          <Trash2 size={16} /> Delete
+                        </Button>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

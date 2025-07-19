@@ -4,53 +4,36 @@ import { App } from './App';
 import './styles/index.css';
 <% if (authProvider === 'clerk') { %>
 import { ClerkProvider } from '@clerk/clerk-react';
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+if (!clerkPubKey) {
+  throw new Error('Missing Clerk publishable key');
+}
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <ClerkProvider publishableKey={clerkPubKey}>
+    <App />
+  </ClerkProvider>
+);
 <% } else if (authProvider === 'auth0') { %>
 import { Auth0Provider } from '@auth0/auth0-react';
-<% } else if (authProvider === 'jwt') { %>
-import { AuthProvider } from './hooks/useAuth';
-<% } %>
-
-<% if (authProvider === 'clerk') { %>
-const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-
-if (!clerkPubKey) {
-  throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY from .env");
-}
-<% } else if (authProvider === 'auth0') { %>
 const auth0Domain = import.meta.env.VITE_AUTH0_DOMAIN;
 const auth0ClientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
-
 if (!auth0Domain || !auth0ClientId) {
-  throw new Error("Missing Auth0 environment variables from .env");
+  throw new Error('Missing Auth0 domain or client ID');
 }
-<% } %>
-
-const root = ReactDOM.createRoot(document.getElementById('root')!);
-
-root.render(
-  <React.StrictMode>
-    <% if (authProvider === 'clerk') { %>
-    <ClerkProvider publishableKey={clerkPubKey}>
-      <App />
-    </ClerkProvider>
-    <% } else if (authProvider === 'auth0') { %>
-    <Auth0Provider
-      domain={auth0Domain}
-      clientId={auth0ClientId}
-      authorizationParams={{
-        redirect_uri: window.location.origin,
-        // If you're using Auth0 roles, you might need to request the audience
-        // audience: `https://${auth0Domain}/api/v2/`,
-      }}
-    >
-      <App />
-    </Auth0Provider>
-    <% } else if (authProvider === 'jwt') { %>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
-    <% } else { %>
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <Auth0Provider domain={auth0Domain} clientId={auth0ClientId} redirectUri={window.location.origin}>
     <App />
-    <% } %>
-  </React.StrictMode>
+  </Auth0Provider>
 );
+<% } else if (authProvider === 'jwt') { %>
+import { AuthProvider } from './hooks/useAuth';
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <AuthProvider>
+    <App />
+  </AuthProvider>
+);
+<% } else { %>
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <App />
+);
+<% } %>

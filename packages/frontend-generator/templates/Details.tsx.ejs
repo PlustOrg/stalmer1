@@ -67,7 +67,7 @@ export function <%= page.name %>Details() {
       <Card>
         <CardHeader>
           <CardTitle>
-            {data.<%= page.entity.fields[1]?.name || 'name' %>}
+            {data.name || data.title || data.id}
           </CardTitle>
           <CardDescription>
             Details for <%= page.entity.name.toLowerCase() %> {data.id}.
