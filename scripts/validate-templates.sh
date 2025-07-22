@@ -50,6 +50,26 @@ const mockData = {
       }
     }
   },
+  entities: [
+    {
+      name: 'User',
+      fields: [
+        { name: 'id', type: 'UUID', isPrimaryKey: true },
+        { name: 'name', type: 'String' },
+        { name: 'email', type: 'String', isUnique: true },
+        { name: 'password', type: 'Password', isPassword: true },
+      ]
+    }
+  ],
+  entity: {
+    name: 'User',
+    fields: [
+      { name: 'id', type: 'UUID', isPrimaryKey: true },
+      { name: 'name', type: 'String' },
+      { name: 'email', type: 'String', isUnique: true },
+      { name: 'password', type: 'Password', isPassword: true },
+    ]
+  },
   page: {
     name: 'TestPage',
     type: 'table',
@@ -101,7 +121,22 @@ const mockData = {
   auth0Domain: 'test.auth0.com',
   auth0ClientId: 'test-client-id',
   sentryDsn: 'test-dsn',
-  backendPort: 4000
+  backendPort: 4000,
+  dbType: 'postgresql',
+  dbName: 'testdb',
+  appName: 'test-app',
+  rbac: true,
+  permissions: {
+    User: {
+      find: ['ADMIN'],
+      findOne: ['ADMIN'],
+      create: ['ADMIN'],
+      update: ['ADMIN'],
+      delete: ['ADMIN'],
+    }
+  },
+  db: 'postgresql',
+  hasAuth: true,
 };
 
 // Get the directory to scan from command line args
@@ -176,19 +211,28 @@ if (hasErrors) {
 }
 EOL
 
-# Install ejs temporarily if needed
-if ! npm list -g ejs &> /dev/null; then
-  echo "Installing EJS temporarily..."
-  npm install --no-save ejs
-fi
+# Create a package.json in the temp directory to manage dependencies
+cat > "$TEMP_DIR/package.json" <<EOL
+{
+  "dependencies": {
+    "ejs": "latest"
+  }
+}
+EOL
+
+# Install dependencies in the temp directory
+echo "Installing EJS in a temporary directory..."
+npm install --prefix "$TEMP_DIR" --no-save --silent
 
 # Validate templates in all directories
-let HAS_ERRORS=0
+HAS_ERRORS=0
 for dir in "${TEMPLATE_DIRS[@]}"; do
   if [ -d "$dir" ]; then
     echo "Checking templates in $dir..."
-    node "$TEMP_DIR/template-validator.js" "$dir"
-    if [ $? -ne 0 ]; then
+    # Use npx to run the node script, which makes sure that the local node_modules are available.
+    # We add `|| true` so that the script doesn't exit immediately on error (because of `set -e`),
+    # allowing us to report all errors from all template directories.
+    if ! node "$TEMP_DIR/template-validator.js" "$dir"; then
       HAS_ERRORS=1
     fi
   else
@@ -196,7 +240,7 @@ for dir in "${TEMPLATE_DIRS[@]}"; do
   fi
 done
 
-if [ $HAS_ERRORS -eq 1 ]; then
+if [ $HAS_ERRORS -ne 0 ]; then
   echo "Template validation failed!"
   exit 1
 else

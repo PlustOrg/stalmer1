@@ -6,14 +6,14 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "<%= port || 4000 %>:<%= port || 4000 %>"
+      - "<%= backendPort || 4000 %>:<%= backendPort || 4000 %>"
     environment:
       <% if (db === 'postgresql') { %>
       DATABASE_URL: "postgresql://postgres:password@postgres:5432/<%= dbName || 'postgres' %>"
       <% } else { %>
       DATABASE_URL: "file:/app/prisma/dev.db"
       <% } %>
-      PORT: <%= port || 4000 %>
+      PORT: <%= backendPort || 4000 %>
       <% if (authProvider === 'jwt') { %>
       JWT_SECRET: your-secret-key
       <% } else if (authProvider === 'auth0') { %>
