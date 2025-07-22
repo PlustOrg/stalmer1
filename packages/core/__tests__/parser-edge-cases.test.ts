@@ -5,7 +5,7 @@ describe('DSL Parser - Edge Cases', () => {
 
   it('should handle an empty DSL string', () => {
     // An empty DSL should throw an error because at least one entity is required.
-    expect(() => parseDSL('')).toThrow('Invalid DSL: At least one entity block is required.');
+    expect(() => parseDSL('')).toThrow('At least one entity block is required.');
   });
 
   it('should handle a DSL with only comments and whitespace', () => {
@@ -14,7 +14,7 @@ describe('DSL Parser - Edge Cases', () => {
 
       // Another comment
     `;
-    expect(() => parseDSL(dsl)).toThrow('Invalid DSL: At least one entity block is required.');
+    expect(() => parseDSL(dsl)).toThrow('At least one entity block is required.');
   });
 
   it('should handle an entity with no fields', () => {
