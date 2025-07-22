@@ -42,7 +42,7 @@ function hasPackage(dir: string, pkg: string): boolean {
   try {
     const packageJson = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf-8'));
     return !!(packageJson.dependencies?.[pkg] || packageJson.devDependencies?.[pkg]);
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -116,7 +116,7 @@ export const testCommand = new Command('test')
       if (!hasPackage(testDirs.backend, 'jest')) {
         try {
           await installTestDependencies(testDirs.backend);
-        } catch (error) {
+        } catch {
           console.error('Failed to install backend test dependencies');
           process.exit(1);
         }
@@ -139,7 +139,7 @@ export const testCommand = new Command('test')
       if (!hasPackage(testDirs.frontend, 'vitest')) {
         try {
           await installTestDependencies(testDirs.frontend);
-        } catch (error) {
+        } catch {
           console.error('Failed to install frontend test dependencies');
           process.exit(1);
         }

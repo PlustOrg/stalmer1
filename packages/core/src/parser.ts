@@ -237,7 +237,7 @@ function parseEntity(lines: string[], startIndex: number, name: string): [IREnti
           } else {
             throw new Error(`Line ${i + 1}: Default value for field '${fieldName}' must be a string, number, or boolean`);
           }
-        } catch (error) {
+        } catch {
           throw new Error(`Line ${i + 1}: Invalid default value for field '${fieldName}' in entity '${name}'`);
         }
       }
