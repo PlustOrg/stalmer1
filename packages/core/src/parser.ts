@@ -1,3 +1,4 @@
+import { DSLParsingError } from './errors';
 import { IApp, IREntity, IRField, IRPage, IRConfig, IRWorkflow } from './ir';
 
 function cleanLine(line: string): string {
@@ -130,7 +131,7 @@ function validateFieldType(type: string): string | null {
   return null;
 }
 
-function parseEntity(lines: string[], startIndex: number, name: string): [IREntity, number] {
+function parseEntity(lines: string[], startIndex: number, name: string, filePath?: string): [IREntity, number] {
   const entity: IREntity = { name, fields: [], relations: [] };
   let i = startIndex;
   const baseIndent = getIndent(lines[i - 1]);
@@ -143,11 +144,11 @@ function parseEntity(lines: string[], startIndex: number, name: string): [IREnti
   while (i < lines.length) {
     const line = lines[i];
     const indent = getIndent(line);
-    const lineNumber = i + 1; // For error reporting (1-based)
+    const lineNumber = i + 1;
 
     if (indent <= baseIndent) {
       if (cleanLine(line) === '}') {
-        i++; // consume '}'
+        i++;
       }
       break;
     }
@@ -161,27 +162,24 @@ function parseEntity(lines: string[], startIndex: number, name: string): [IREnti
     const parts = cleaned.split(/\s+/);
     const fieldName = parts[0].replace(':', '');
     
-    // Validate field name
     const fieldNameError = validateFieldName(fieldName);
     if (fieldNameError) {
-      throw new Error(`Line ${lineNumber}: ${fieldNameError} in entity '${name}'`);
+      throw new DSLParsingError( `${fieldNameError} in entity '${name}'`, filePath, lineNumber);
     }
     
-    // Check for duplicate fields
     if (entity.fields.find(f => f.name === fieldName)) {
-      throw new Error(`Line ${lineNumber}: Duplicate field name '${fieldName}' in entity '${name}'`);
+      throw new DSLParsingError(`Duplicate field name '${fieldName}' in entity '${name}'`, filePath, lineNumber);
     }
     
     if (!parts[1]) {
-      throw new Error(`Line ${lineNumber}: Field type is required for field '${fieldName}' in entity '${name}'`);
+      throw new DSLParsingError(`Field type is required for field '${fieldName}' in entity '${name}'`, filePath, lineNumber);
     }
     
     const fieldType = parts[1];
     
-    // Validate field type
     const fieldTypeError = validateFieldType(fieldType);
     if (fieldTypeError && !cleaned.includes('@relation')) {
-      throw new Error(`Line ${lineNumber}: ${fieldTypeError} in entity '${name}'`);
+      throw new DSLParsingError(`${fieldTypeError} in entity '${name}'`, filePath, lineNumber);
     }
 
     if (cleaned.includes('@relation')) {
@@ -227,7 +225,6 @@ function parseEntity(lines: string[], startIndex: number, name: string): [IREnti
         field.isDateOnly = true;
       }
       
-      // Parse default value
       const defaultMatch = cleaned.match(/default\((.*?)\)/);
       if (defaultMatch) {
         try {
@@ -235,14 +232,12 @@ function parseEntity(lines: string[], startIndex: number, name: string): [IREnti
           if (typeof parsedValue === 'string' || typeof parsedValue === 'number' || typeof parsedValue === 'boolean') {
             field.default = parsedValue;
           } else {
-            throw new Error(`Line ${i + 1}: Default value for field '${fieldName}' must be a string, number, or boolean`);
+            throw new DSLParsingError(`Default value for field '${fieldName}' must be a string, number, or boolean`, filePath, lineNumber);
           }
         } catch {
-          throw new Error(`Line ${i + 1}: Invalid default value for field '${fieldName}' in entity '${name}'`);
+          throw new DSLParsingError(`Invalid default value for field '${fieldName}' in entity '${name}'`, filePath, lineNumber);
         }
       }
-
-      // Parse validation rules
       const validateMatch = cleaned.match(/validate\((.*?)\)/);
       if (validateMatch) {
         field.validate = validateMatch[1];
@@ -276,10 +271,9 @@ function parseEntity(lines: string[], startIndex: number, name: string): [IREnti
   return [entity, i - 1];
 }
 
-export function parseDSL(dsl: string): IApp {
-  // Handle empty DSL or DSL with only comments/whitespace
+export function parseDSL(dsl: string, filePath?: string): IApp {
   if (!dsl.trim() || dsl.trim().split('\n').every(line => !line.trim() || line.trim().startsWith('//'))) {
-    throw new Error('Invalid DSL: At least one entity block is required.');
+    throw new DSLParsingError('At least one entity block is required.', filePath);
   }
   
   const app: IApp = { name: 'App', entities: [], pages: [], workflows: [], config: { enums: {} } };
@@ -299,7 +293,7 @@ export function parseDSL(dsl: string): IApp {
       let block, endIndex = i;
 
       if (type === 'entity') {
-        [block, endIndex] = parseEntity(lines, i + 1, name);
+        [block, endIndex] = parseEntity(lines, i + 1, name, filePath);
         app.entities.push(block as IREntity);
       } else {
         [block, endIndex] = parseBlock(lines, i + 1);
@@ -309,8 +303,8 @@ export function parseDSL(dsl: string): IApp {
             
             const page: IRPage = {
               name: pageName,
-              type: 'table', // default
-              entity: '', // must be provided
+              type: 'table',
+              entity: '',
               route: `/${pageName.toLowerCase()}`,
             };
 
@@ -352,9 +346,8 @@ export function parseDSL(dsl: string): IApp {
             }
 
             if (!page.entity) {
-              // Allow custom pages to not have an entity
               if (page.type !== 'custom') {
-                throw new Error(`Page '${pageName}' of type '${page.type}' must have an 'entity' property.`);
+                throw new DSLParsingError(`Page '${pageName}' of type '${page.type}' must have an 'entity' property.`, filePath, i + 1);
               }
             }
             

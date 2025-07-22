@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
-import { parseDSL } from '@stalmer1/core';
+import { parseDSL, DSLParsingError } from '@stalmer1/core';
 import { generateFullProject } from './full-generator';
 import { spawn } from 'child_process';
 
@@ -135,9 +135,8 @@ export const generateCommand = new Command('generate')
     const dsl = fs.readFileSync(schemaPath, 'utf-8');
 
     try {
-      // Parse the DSL to IR
       console.log('Parsing DSL schema...');
-      const ir = parseDSL(dsl);
+      const ir = parseDSL(dsl, schemaPath);
       console.log('Schema parsed successfully.');
 
       if (options.clean) {
@@ -166,7 +165,13 @@ export const generateCommand = new Command('generate')
       console.log('\nSuccess! Your application has been generated. To start it, run:');
       console.log('  stalmer1 serve');
     } catch (err) {
-      console.error('Error during code generation:', err instanceof Error ? err.message : "Unknown error occurred");
+      if (err instanceof DSLParsingError) {
+        console.error(`\nError parsing DSL file: ${err.message}`);
+      } else if (err instanceof Error) {
+        console.error(`\nError during code generation: ${err.message}`);
+      } else {
+        console.error('\nAn unknown error occurred during code generation.');
+      }
       process.exit(1);
     }
   });
