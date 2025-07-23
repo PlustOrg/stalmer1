@@ -4,8 +4,7 @@ import { IRPage } from '../src/ir';
 describe('DSL Parser - Edge Cases', () => {
 
   it('should handle an empty DSL string', () => {
-    // An empty DSL should throw an error because at least one entity is required.
-    expect(() => parseDSL('')).toThrow('At least one entity block is required.');
+    expect(() => parseDSL('')).toThrow('DSL file is empty or contains only comments. At least one entity block is required.');
   });
 
   it('should handle a DSL with only comments and whitespace', () => {
@@ -14,7 +13,7 @@ describe('DSL Parser - Edge Cases', () => {
 
       // Another comment
     `;
-    expect(() => parseDSL(dsl)).toThrow('At least one entity block is required.');
+    expect(() => parseDSL(dsl)).toThrow('DSL file is empty or contains only comments. At least one entity block is required.');
   });
 
   it('should handle an entity with no fields', () => {
@@ -45,11 +44,6 @@ describe('DSL Parser - Edge Cases', () => {
     const fields = app.entities[0].fields;
     expect(fields).toHaveLength(11); // 10 + 1 for auto-id
     
-    // Just check that we have the right number of fields
-    // The types may be normalized differently depending on implementation
-    expect(fields.length).toEqual(11);
-    
-    // Check that each field has the correct name
     const fieldNames = fields.map(f => f.name);
     expect(fieldNames).toEqual([
       'id', 'f_string', 'f_text', 'f_int', 'f_float', 
@@ -128,12 +122,13 @@ describe('DSL Parser - Edge Cases', () => {
   });
 
   it('should throw an error for a malformed block', () => {
-    const dsl = 'entity User {'; // Missing closing brace
-    // This is a bit tricky to test because the current parser is lenient.
-    // A more robust parser would use a stack to check for balanced braces.
-    // For now, we can test that it doesn't hang and produces a partial result.
-    const app = parseDSL(dsl);
-    expect(app.entities).toHaveLength(1);
+    // Create a DSL with a field that's missing its type
+    const dsl = `
+      entity User {
+        malformed:
+      }
+    `;
+    expect(() => parseDSL(dsl)).toThrow();
   });
 
   it('should handle quoted string values with spaces', () => {
@@ -149,6 +144,81 @@ describe('DSL Parser - Edge Cases', () => {
     const app = parseDSL(dsl);
     const page = app.pages[0] as IRPage;
     expect(page.title).toBe('A Page with a Long Title');
+  });
+
+  it('should handle a complex DSL with all features', () => {
+    const dsl = `
+      config auth {
+        provider: jwt
+        userEntity: User
+      }
+
+      config integrations {
+        email: {
+          provider: sendgrid
+          apiKey: env(SENDGRID_API_KEY)
+        }
+      }
+
+      enum UserRole {
+        ADMIN
+        USER
+      }
+
+      entity User {
+        id: UUID primaryKey
+        email: String unique
+        password: Password
+        role: UserRole default(USER)
+      }
+
+      entity Post {
+        id: UUID primaryKey
+        title: String
+        content: Text
+        author: User @relation(name: "UserPosts")
+      }
+
+      page UserList {
+        type: table
+        entity: User
+        route: "/users"
+        columns: [
+          { field: email, label: "Email" },
+          { field: role, label: "Role" }
+        ]
+      }
+
+      workflow UserOnboarding {
+        trigger: {
+          event: "user.created"
+          entity: User
+        }
+        steps: [
+          {
+            action: sendEmail
+            inputs: {
+              template: "welcome"
+              recipient: trigger.entity.email
+            }
+          }
+        ]
+      }
+    `;
+
+    const app = parseDSL(dsl);
+
+    expect(app.config?.auth?.provider).toBe('jwt');
+    expect(app.config?.auth?.userEntity).toBe('User');
+    expect(app.config?.integrations?.email?.provider).toBe('sendgrid');
+    expect(app.config?.enums?.UserRole).toEqual(['ADMIN', 'USER']);
+    expect(app.entities).toHaveLength(2);
+    expect(app.entities[0].name).toBe('User');
+    expect(app.entities[1].name).toBe('Post');
+    expect(app.pages).toHaveLength(1);
+    expect(app.pages[0].name).toBe('UserList');
+    expect(app.workflows).toHaveLength(1);
+    expect(app.workflows?.[0].name).toBe('UserOnboarding');
   });
 
 });

@@ -10,6 +10,17 @@ function getIndent(line: string): number {
   return line.match(/^\s*/)?.[0].length ?? 0;
 }
 
+function throwParsingError(
+  message: string,
+  filePath: string | undefined,
+  lines: string[],
+  lineIndex: number,
+  charIndex = 0
+) {
+  const context = lines[lineIndex];
+  throw new DSLParsingError(message, filePath, lineIndex + 1, charIndex + 1, context);
+}
+
 type ParsedValue = string | number | boolean | ParsedValue[] | { [key: string]: ParsedValue };
 
 function parseValue(value: string): ParsedValue {
@@ -28,7 +39,7 @@ function parseValue(value: string): ParsedValue {
   if (value.startsWith('[') && value.endsWith(']')) {
     try {
       // Attempt to parse as JSON, with relaxed syntax for keys and single quotes
-      return JSON.parse(value.replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":').replace(/'/g, '"'));
+      return JSON.parse(value.replace(/([{,][\s]*)(\w+)[\s]*:/g, '$1"$2":').replace(/'/g, '"'));
     } catch {
       // Fallback for simple arrays of strings
       return value.slice(1, -1).split(',').map(s => parseValue(s.trim()));
@@ -37,7 +48,7 @@ function parseValue(value: string): ParsedValue {
   return value;
 }
 
-function parseBlock(lines: string[], startIndex: number): [Record<string, unknown>, number] {
+function parseBlock(lines: string[], startIndex: number, filePath?: string): [Record<string, unknown>, number] {
   const block: Record<string, unknown> = {};
   let i = startIndex;
   const baseIndent = getIndent(lines[i - 1]);
@@ -68,7 +79,7 @@ function parseBlock(lines: string[], startIndex: number): [Record<string, unknow
     const value = parts.slice(1).join(':').trim();
 
     if (value.endsWith('{')) {
-      const [nestedBlock, endIndex] = parseBlock(lines, i + 1);
+      const [nestedBlock, endIndex] = parseBlock(lines, i + 1, filePath);
       block[key] = nestedBlock;
       i = endIndex;
     } else if (value.startsWith('[')) {
@@ -112,13 +123,16 @@ function parseBlock(lines: string[], startIndex: number): [Record<string, unknow
   return [block, i];
 }
 
-function validateFieldName(name: string): string | null {
-  if (!name || name.trim() === '') return 'Field name cannot be empty';
-  if (!name.match(/^[a-zA-Z_][a-zA-Z0-9_]*$/)) return 'Field name must start with a letter or underscore and contain only letters, numbers, and underscores';
-  return null;
+function validateFieldName(name: string, entityName: string, lines: string[], lineIndex: number, filePath?: string) {
+  if (!name || name.trim() === '') {
+    throwParsingError('Field name cannot be empty', filePath, lines, lineIndex);
+  }
+  if (!name.match(/^[a-zA-Z_][a-zA-Z0-9_]*$/)) {
+    throwParsingError(`Invalid field name: "${name}". Field names must start with a letter or underscore and contain only letters, numbers, and underscores.`, filePath, lines, lineIndex);
+  }
 }
 
-function validateFieldType(type: string): string | null {
+function validateFieldType(type: string, entityName: string, lines: string[], lineIndex: number, filePath?: string) {
   const validTypes = [
     'String', 'Text', 'Int', 'Float', 'Decimal', 'Boolean', 
     'DateTime', 'Date', 'UUID', 'JSON', 'Password'
@@ -126,9 +140,8 @@ function validateFieldType(type: string): string | null {
   const baseType = type.replace('[]', ''); // Remove array notation
   
   if (!validTypes.includes(baseType) && !baseType.match(/^[A-Z][a-zA-Z0-9]*$/)) {
-    return `Invalid field type: '${type}'. Must be one of: ${validTypes.join(', ')} or an entity reference`;
+    throwParsingError(`Invalid field type: '${type}'. Must be one of: ${validTypes.join(', ')} or a valid entity reference.`, filePath, lines, lineIndex);
   }
-  return null;
 }
 
 function parseEntity(lines: string[], startIndex: number, name: string, filePath?: string): [IREntity, number] {
@@ -144,7 +157,6 @@ function parseEntity(lines: string[], startIndex: number, name: string, filePath
   while (i < lines.length) {
     const line = lines[i];
     const indent = getIndent(line);
-    const lineNumber = i + 1;
 
     if (indent <= baseIndent) {
       if (cleanLine(line) === '}') {
@@ -162,24 +174,20 @@ function parseEntity(lines: string[], startIndex: number, name: string, filePath
     const parts = cleaned.split(/\s+/);
     const fieldName = parts[0].replace(':', '');
     
-    const fieldNameError = validateFieldName(fieldName);
-    if (fieldNameError) {
-      throw new DSLParsingError( `${fieldNameError} in entity '${name}'`, filePath, lineNumber);
-    }
+    validateFieldName(fieldName, name, lines, i, filePath);
     
     if (entity.fields.find(f => f.name === fieldName)) {
-      throw new DSLParsingError(`Duplicate field name '${fieldName}' in entity '${name}'`, filePath, lineNumber);
+      throwParsingError(`Duplicate field name '${fieldName}' in entity '${name}'`, filePath, lines, i);
     }
     
     if (!parts[1]) {
-      throw new DSLParsingError(`Field type is required for field '${fieldName}' in entity '${name}'`, filePath, lineNumber);
+      throwParsingError(`Field type is required for field '${fieldName}' in entity '${name}'`, filePath, lines, i);
     }
     
     const fieldType = parts[1];
     
-    const fieldTypeError = validateFieldType(fieldType);
-    if (fieldTypeError && !cleaned.includes('@relation')) {
-      throw new DSLParsingError(`${fieldTypeError} in entity '${name}'`, filePath, lineNumber);
+    if (!cleaned.includes('@relation')) {
+        validateFieldType(fieldType, name, lines, i, filePath);
     }
 
     if (cleaned.includes('@relation')) {
@@ -232,10 +240,10 @@ function parseEntity(lines: string[], startIndex: number, name: string, filePath
           if (typeof parsedValue === 'string' || typeof parsedValue === 'number' || typeof parsedValue === 'boolean') {
             field.default = parsedValue;
           } else {
-            throw new DSLParsingError(`Default value for field '${fieldName}' must be a string, number, or boolean`, filePath, lineNumber);
+            throwParsingError(`Default value for field '${fieldName}' must be a string, number, or boolean`, filePath, lines, i);
           }
         } catch {
-          throw new DSLParsingError(`Invalid default value for field '${fieldName}' in entity '${name}'`, filePath, lineNumber);
+          throwParsingError(`Invalid default value for field '${fieldName}' in entity '${name}'`, filePath, lines, i);
         }
       }
       const validateMatch = cleaned.match(/validate\((.*?)\)/);
@@ -272,12 +280,12 @@ function parseEntity(lines: string[], startIndex: number, name: string, filePath
 }
 
 export function parseDSL(dsl: string, filePath?: string): IApp {
-  if (!dsl.trim() || dsl.trim().split('\n').every(line => !line.trim() || line.trim().startsWith('//'))) {
-    throw new DSLParsingError('At least one entity block is required.', filePath);
+  const lines = dsl.split('\n');
+  if (!dsl.trim() || lines.every(line => !line.trim() || line.trim().startsWith('//'))) {
+    throw new DSLParsingError('DSL file is empty or contains only comments. At least one entity block is required.', filePath);
   }
   
   const app: IApp = { name: 'App', entities: [], pages: [], workflows: [], config: { enums: {} } };
-  const lines = dsl.split('\n');
   let i = 0;
 
   while (i < lines.length) {
@@ -296,7 +304,7 @@ export function parseDSL(dsl: string, filePath?: string): IApp {
         [block, endIndex] = parseEntity(lines, i + 1, name, filePath);
         app.entities.push(block as IREntity);
       } else {
-        [block, endIndex] = parseBlock(lines, i + 1);
+        [block, endIndex] = parseBlock(lines, i + 1, filePath);
         switch (type) {
           case 'page': {
             const pageName = name;
@@ -345,10 +353,8 @@ export function parseDSL(dsl: string, filePath?: string): IApp {
                 }
             }
 
-            if (!page.entity) {
-              if (page.type !== 'custom') {
-                throw new DSLParsingError(`Page '${pageName}' of type '${page.type}' must have an 'entity' property.`, filePath, i + 1);
-              }
+            if (!page.entity && page.type !== 'custom') {
+                throwParsingError(`Page '${pageName}' of type '${page.type}' must have an 'entity' property.`, filePath, lines, i);
             }
             
             app.pages.push(page);
@@ -375,9 +381,57 @@ export function parseDSL(dsl: string, filePath?: string): IApp {
       }
       i = endIndex + 1;
     } else {
-      i++;
+        if (i < lines.length -1) {
+            i++;
+        } else {
+            throwParsingError('Invalid syntax', filePath, lines, i);
+        }
     }
   }
 
+  validateIR(app, filePath, lines);
   return app;
+}
+
+// Main validation function
+export function validateIR(app: IApp, filePath?: string, lines: string[] = []) {
+  const entityNames = new Set(app.entities.map(e => e.name));
+  const enumNames = new Set(Object.keys(app.config?.enums || {}));
+
+  // Validate Relationships
+  for (const entity of app.entities) {
+    if (entity.relations) {
+      for (const relation of entity.relations) {
+        if (!entityNames.has(relation.target)) {
+          // Find line number for this error
+          const lineIndex = lines.findIndex(l => l.includes(`entity ${entity.name}`) && l.includes(relation.field));
+          throwParsingError(`Entity '${relation.target}' not found for relation '${relation.field}' in entity '${entity.name}'`, filePath, lines, lineIndex > -1 ? lineIndex : 0);
+        }
+      }
+    }
+    // Validate field types that are enums
+    for (const field of entity.fields) {
+        if (field.type.match(/^[A-Z][a-zA-Z0-9]*$/) && !entityNames.has(field.type) && !enumNames.has(field.type)) {
+            const validTypes = ['String', 'Text', 'Int', 'Float', 'Decimal', 'Boolean', 'DateTime', 'Date', 'UUID', 'JSON', 'Password'];
+            if (!validTypes.includes(field.type) && field.type !== 'Json') {
+                const lineIndex = lines.findIndex(l => l.includes(`entity ${entity.name}`) && l.includes(field.name));
+                throwParsingError(`Type '${field.type}' for field '${field.name}' is not a defined entity or enum.`, filePath, lines, lineIndex > -1 ? lineIndex : 0);
+            }
+        }
+    }
+  }
+
+  // Validate Page Entities
+  for (const page of app.pages) {
+    if (page.entity && !entityNames.has(page.entity)) {
+      const lineIndex = lines.findIndex(l => l.includes(`page ${page.name}`));
+      throwParsingError(`Entity '${page.entity}' not found for page '${page.name}'`, filePath, lines, lineIndex > -1 ? lineIndex : 0);
+    }
+  }
+
+  // Validate Auth Config
+  if (app.config?.auth?.userEntity && !entityNames.has(app.config.auth.userEntity)) {
+    const lineIndex = lines.findIndex(l => l.includes('config auth'));
+    throwParsingError(`User entity '${app.config.auth.userEntity}' not found in auth config`, filePath, lines, lineIndex > -1 ? lineIndex : 0);
+  }
 }
