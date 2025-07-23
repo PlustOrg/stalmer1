@@ -35,6 +35,8 @@ export interface IRField {
   min?: number;
   max?: number;
   pattern?: string;
+  isVirtual?: boolean;
+  virtualFrom?: string;
 }
 
 export interface IRRelation {

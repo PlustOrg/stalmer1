@@ -99,6 +99,33 @@ export async function generateBackend(app: IApp, outDir: string, verbose: boolea
       serviceContent
     );
     if (verbose) console.log(`Generated ${entity.name.toLowerCase()}.service.ts`);
+
+    // Create resolver file if virtual fields exist
+    const virtualFields = entity.fields.filter(f => f.isVirtual);
+    if (virtualFields.length > 0) {
+      const resolverFile = virtualFields[0].virtualFrom?.split('#')[0];
+      if (resolverFile) {
+        const resolverPath = path.join(entityDir, resolverFile);
+
+        if (!fs.existsSync(resolverPath)) {
+          let resolverContent = `// This file is safe to edit. Once generated, it will not be overwritten.\n\n`;
+          resolverContent += `import { ${entity.name} } from '@prisma/client';\n\n`;
+
+          for (const field of virtualFields) {
+            if (field.virtualFrom) {
+              const functionName = field.virtualFrom.split('#')[1];
+              resolverContent += `export function ${functionName}(entity: ${entity.name}): ${field.type} {\n`;
+              resolverContent += `  // TODO: Implement your resolver logic here\n`;
+              resolverContent += `  return null;\n`;
+              resolverContent += `}\n\n`;
+            }
+          }
+
+          fs.writeFileSync(resolverPath, resolverContent);
+          if (verbose) console.log(`Generated ${resolverFile}`);
+        }
+      }
+    }
   }
   
   // Generate auth services

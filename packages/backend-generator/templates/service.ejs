@@ -3,17 +3,33 @@ import { PrismaService } from '../prisma/prisma.service';
 <% const hasPasswordField = entity.fields.some(f => f.isPassword); %>
 <% if (hasPasswordField) { %>import * as bcrypt from 'bcrypt';<% } %>
 import { <%= entity.name %> } from '@prisma/client';
+<% const virtualFields = entity.fields.filter(f => f.isVirtual); %>
+<% if (virtualFields.length > 0) { %>
+<% const resolverFile = virtualFields[0].virtualFrom.split('#')[0].replace('.ts', ''); %>
+import { <% const functionNames = virtualFields.map(f => f.virtualFrom.split('#')[1]); %><%= functionNames.join(', ') %> } from './<%= resolverFile %>';
+<% } %>
 
 @Injectable()
 export class <%= entity.name %>Service {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(): Promise<<%= entity.name %>[]> {
-    return this.prisma.<%= entity.name.toLowerCase() %>.findMany();
+  private async _addVirtualFields(entity: <%= entity.name %>) {
+    if (!entity) return null;
+    const result = { ...entity };
+    <% for (const field of virtualFields) { %>
+    result['<%= field.name %>'] = await <%= field.virtualFrom.split('#')[1] %>(entity);
+    <% } %>
+    return result;
   }
 
-  async findOne(id: string): Promise<<%= entity.name %> | null> {
-    return this.prisma.<%= entity.name.toLowerCase() %>.findUnique({ where: { id } });
+  async findAll(): Promise<any[]> {
+    const records = await this.prisma.<%= entity.name.toLowerCase() %>.findMany();
+    return Promise.all(records.map(r => this._addVirtualFields(r)));
+  }
+
+  async findOne(id: string): Promise<any | null> {
+    const record = await this.prisma.<%= entity.name.toLowerCase() %>.findUnique({ where: { id } });
+    return this._addVirtualFields(record);
   }
 
   async create(data: Omit<<%= entity.name %>, 'id' | 'createdAt' | 'updatedAt'>): Promise<<%= entity.name %>> {

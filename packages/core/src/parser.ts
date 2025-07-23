@@ -260,6 +260,12 @@ function parseEntity(lines: string[], startIndex: number, name: string, filePath
         if (patternMatch) field.pattern = patternMatch[1];
       }
 
+      const virtualMatch = cleaned.match(/@virtual\(from:\s*"([^"]+)"\)/);
+      if (virtualMatch) {
+        field.isVirtual = true;
+        field.virtualFrom = virtualMatch[1];
+      }
+
       entity.fields.push(field);
     }
     i++;
