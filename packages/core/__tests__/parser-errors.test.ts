@@ -1,4 +1,4 @@
-import { parseDSL, DSLParsingError, validateIR } from '../src/index';
+import { parseDSL, DSLParsingError } from '../src/index';
 
 describe('DSL Parser Error Handling', () => {
   const filePath = 'test.dsl';
