@@ -115,37 +115,7 @@ entity User {
 
 ---
 
-## 4. `view` Blocks: Defining Database Views
-
-Views allow you to create calculated fields that are queryable at the database level, enabling sorting and filtering.
-
-### 4.1. View Definition
-
-```dsl
-view UserView {
-  from: User
-  fields: [
-    { name: "fullName", type: String, expression: "firstName || ' ' || lastName" },
-    { name: "postCount", type: Int, expression: "(SELECT COUNT(*) FROM Post WHERE Post.authorId = User.id)" }
-  ]
-}
-```
-
-### 4.2. View Usage
-
-Once a view is defined, you can use it as the `entity` for a `page`.
-
-```dsl
-page UserList {
-  type: table
-  entity: UserView // This page now uses the view
-  // ... columns can now sort/filter by 'fullName' and 'postCount'
-}
-```
-
----
-
-## 5. `page` Blocks: Defining UI
+## 4. `page` Blocks: Defining UI
 
 Pages describe the application's user interface screens.
 

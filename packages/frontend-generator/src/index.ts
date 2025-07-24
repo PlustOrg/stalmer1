@@ -15,19 +15,10 @@ export async function generateFrontend(app: IApp, outDir: string, verbose: boole
   const auth0ClientId = app.config?.auth?.props?.auth0ClientId;
   const backendPort = 4000; // Default port for backend
   
-  const hydratedPages = pages.map(page => {
-    const entity = app.entities.find(e => e.name === page.entity);
-    if (entity) {
-      return { ...page, entity };
-    }
-
-    const view = app.views?.find(v => v.name === page.entity);
-    if (view) {
-      return { ...page, entity: { name: view.name, fields: view.fields } };
-    }
-
-    return page;
-  });
+  const hydratedPages = pages.map(page => ({
+    ...page,
+    entity: app.entities.find(e => e.name === page.entity)
+  }));
   
   // Create directory structure
   fs.mkdirSync(path.join(outDir, 'src'), { recursive: true });

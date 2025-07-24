@@ -4,8 +4,8 @@
 export interface IApp {
   name: string;
   entities: IREntity[];
-  pages: IRPage[];
   views?: IRView[];
+  pages: IRPage[];
   config?: IRConfig;
   workflows?: IRWorkflow[];
 }

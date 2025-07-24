@@ -1,13 +1,14 @@
 // Generates a Prisma schema from IREntity[]
-import { IREntity, IRField, IRRelation, IRView } from '@stalmer1/core';
+import { IApp, IREntity, IRField, IRRelation, IRView } from '@stalmer1/core';
 
 /**
  * Generates a Prisma schema from the entities defined in the DSL
- * @param entities - The list of entities from the IR
+ * @param app - The entire application IR
  * @param dbType - The database type (sqlite or postgresql)
  * @returns A string containing the Prisma schema
  */
-export function generatePrismaSchema(entities: IREntity[], views: IRView[] | undefined, dbType: 'sqlite' | 'postgresql' = 'sqlite'): string {
+export function generatePrismaSchema(app: IApp, dbType: 'sqlite' | 'postgresql' = 'sqlite'): string {
+  const { entities, views } = app;
   // Generate the Prisma schema header
   let schema = `// This file is generated - DO NOT EDIT\n\n`;
   
@@ -55,23 +56,21 @@ export function generatePrismaSchema(entities: IREntity[], views: IRView[] | und
   }
 
   // Generate models from views
-    if (views) {
-        for (const view of views) {
-            schema += `model ${view.name} {\n`;
+  if (views) {
+    for (const view of views) {
+      schema += `/// @readonly\n`;
+      schema += `model ${view.name} {\n`;
 
-            // Add a dummy id field since Prisma requires an @id field for all models
-            schema += `  id String @id @default(uuid()) /// @readonly\n`;
+      // Process view fields
+      for (const field of view.fields) {
+        const prismaType = mapType(field.type);
+        schema += `  ${field.name} ${prismaType}\n`;
+      }
 
-            for (const field of view.fields) {
-                const prismaType = mapType(field.type);
-                schema += `  ${field.name} ${prismaType} /// @readonly\n`;
-            }
-
-            schema += `\n  @@map("${view.name}")\n`;
-            schema += `  @@managed(false)\n`;
-            schema += `}\n\n`;
-        }
+      schema += `\n  @@map(name: null) /// @db.view\n`;
+      schema += `}\n\n`;
     }
+  }
   
   return schema;
 }
