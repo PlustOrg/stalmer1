@@ -4,9 +4,22 @@
 export interface IApp {
   name: string;
   entities: IREntity[];
+  views?: IRView[];
   pages: IRPage[];
   config?: IRConfig;
   workflows?: IRWorkflow[];
+}
+
+export interface IRView {
+  name: string;
+  from: string;
+  fields: IRViewField[];
+}
+
+export interface IRViewField {
+  name: string;
+  type: string;
+  expression: string;
 }
 
 export interface IREntity {

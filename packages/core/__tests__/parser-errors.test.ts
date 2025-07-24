@@ -1,4 +1,4 @@
-import { parseDSL, DSLParsingError, validateIR } from '../src/index';
+import { parseDSL, DSLParsingError } from '../src/index';
 
 describe('DSL Parser Error Handling', () => {
   const filePath = 'test.dsl';
@@ -63,7 +63,19 @@ describe('DSL Parser Error Handling', () => {
       }
     `;
     expect(() => parseDSL(dsl, filePath)).toThrow(
-      new DSLParsingError("Entity 'NonExistentEntity' not found for page 'UserList'", filePath, 2, 7, '      page UserList {')
+      new DSLParsingError("Entity or View 'NonExistentEntity' not found for page 'UserList'", filePath, 2, 7, '      page UserList {')
+    );
+  });
+
+  it('should throw an error for a view with a non-existent entity', () => {
+    const dsl = `
+      view UserView {
+        from: NonExistentEntity
+        fields: []
+      }
+    `;
+    expect(() => parseDSL(dsl, filePath)).toThrow(
+      new DSLParsingError("Entity 'NonExistentEntity' not found for view 'UserView'", filePath, 2, 7, '      view UserView {')
     );
   });
 
