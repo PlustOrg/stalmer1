@@ -1,5 +1,5 @@
 import * as ejs from 'ejs';
-import { IApp, IRPage } from '@stalmer1/core';
+import { IApp, IRPage, IRView } from '@stalmer1/core';
 import { generatePrismaSchema } from './prisma';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -41,14 +41,39 @@ function addDependencyToPackageJson(outDir: string, packageName: string, version
 // Re-export generateDockerFiles function
 export { generateDockerFiles } from './docker';
 
+function generateMigrationFiles(views: IRView[] | undefined, outDir: string, dbType: 'sqlite' | 'postgresql') {
+    if (!views || views.length === 0) {
+        return;
+    }
+
+    const migrationsDir = path.join(outDir, 'prisma', 'migrations');
+    fs.mkdirSync(migrationsDir, { recursive: true });
+
+    const timestamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 14);
+
+    views.forEach((view, index) => {
+        const migrationName = `${timestamp}_create_view_${view.name.toLowerCase()}`;
+        const migrationDir = path.join(migrationsDir, migrationName);
+        fs.mkdirSync(migrationDir, { recursive: true });
+
+        const fields = view.fields.map(f => `${f.expression} as ${f.name}`).join(', ');
+        const sql = `CREATE VIEW ${view.name} AS SELECT ${fields} FROM ${view.from};`;
+
+        fs.writeFileSync(path.join(migrationDir, 'migration.sql'), sql);
+    });
+}
+
 export async function generateBackend(app: IApp, outDir: string, verbose: boolean = false) {
   // Get database type from app config or default to sqlite
   const dbType = app.config?.db === 'postgresql' ? 'postgresql' : 'sqlite';
   
   // Generate Prisma schema
-  const prismaSchema = generatePrismaSchema(app.entities, dbType as 'sqlite' | 'postgresql');
+  const prismaSchema = generatePrismaSchema(app.entities, app.views, dbType as 'sqlite' | 'postgresql');
   fs.mkdirSync(path.join(outDir, 'prisma'), { recursive: true });
   fs.writeFileSync(path.join(outDir, 'prisma/schema.prisma'), prismaSchema);
+
+  // Generate migration files
+  generateMigrationFiles(app.views, outDir, dbType);
 
   // Generate NestJS modules, controllers, services
   const templatesDir = path.join(__dirname, '..', 'templates');

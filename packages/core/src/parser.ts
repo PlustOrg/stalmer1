@@ -1,5 +1,5 @@
 import { DSLParsingError } from './errors';
-import { IApp, IREntity, IRField, IRPage, IRConfig, IRWorkflow } from './ir';
+import { IApp, IREntity, IRField, IRPage, IRConfig, IRWorkflow, IRView } from './ir';
 
 function cleanLine(line: string): string {
   if (!line) return '';
@@ -285,13 +285,37 @@ function parseEntity(lines: string[], startIndex: number, name: string, filePath
   return [entity, i - 1];
 }
 
+function parseView(lines: string[], startIndex: number, name: string, filePath?: string): [IRView, number] {
+    const [block, endIndex] = parseBlock(lines, startIndex, filePath);
+
+    if (!block.from) {
+        throwParsingError(`View '${name}' must have a 'from' property.`, filePath, lines, startIndex - 1);
+    }
+
+    if (!block.fields || !Array.isArray(block.fields)) {
+        throwParsingError(`View '${name}' must have a 'fields' property that is an array.`, filePath, lines, startIndex - 1);
+    }
+
+    const view: IRView = {
+        name,
+        from: block.from as string,
+        fields: (block.fields as any[]).map(f => ({
+            name: f.name,
+            type: f.type,
+            expression: f.expression,
+        })),
+    };
+
+    return [view, endIndex];
+}
+
 export function parseDSL(dsl: string, filePath?: string): IApp {
   const lines = dsl.split('\n');
   if (!dsl.trim() || lines.every(line => !line.trim() || line.trim().startsWith('//'))) {
     throw new DSLParsingError('DSL file is empty or contains only comments. At least one entity block is required.', filePath);
   }
   
-  const app: IApp = { name: 'App', entities: [], pages: [], workflows: [], config: { enums: {} } };
+  const app: IApp = { name: 'App', entities: [], pages: [], views: [], workflows: [], config: { enums: {} } };
   let i = 0;
 
   while (i < lines.length) {
@@ -301,7 +325,7 @@ export function parseDSL(dsl: string, filePath?: string): IApp {
       continue;
     }
 
-    const match = line.match(/^(entity|page|workflow|config|enum)\s+(\w+)\s*\{/);
+    const match = line.match(/^(entity|page|workflow|config|enum|view)\s+(\w+)\s*\{/);
     if (match) {
       const [, type, name] = match;
       let block, endIndex = i;
@@ -309,6 +333,12 @@ export function parseDSL(dsl: string, filePath?: string): IApp {
       if (type === 'entity') {
         [block, endIndex] = parseEntity(lines, i + 1, name, filePath);
         app.entities.push(block as IREntity);
+      } else if (type === 'view') {
+        [block, endIndex] = parseView(lines, i + 1, name, filePath);
+        if (!app.views) {
+          app.views = [];
+        }
+        app.views.push(block as IRView);
       } else {
         [block, endIndex] = parseBlock(lines, i + 1, filePath);
         switch (type) {
@@ -428,10 +458,21 @@ export function validateIR(app: IApp, filePath?: string, lines: string[] = []) {
   }
 
   // Validate Page Entities
+  const viewNames = new Set(app.views?.map(v => v.name) || []);
   for (const page of app.pages) {
-    if (page.entity && !entityNames.has(page.entity)) {
+    if (page.entity && !entityNames.has(page.entity) && !viewNames.has(page.entity)) {
       const lineIndex = lines.findIndex(l => l.includes(`page ${page.name}`));
-      throwParsingError(`Entity '${page.entity}' not found for page '${page.name}'`, filePath, lines, lineIndex > -1 ? lineIndex : 0);
+      throwParsingError(`Entity or View '${page.entity}' not found for page '${page.name}'`, filePath, lines, lineIndex > -1 ? lineIndex : 0);
+    }
+  }
+
+  // Validate View Entities
+  if (app.views) {
+    for (const view of app.views) {
+      if (!entityNames.has(view.from)) {
+        const lineIndex = lines.findIndex(l => l.includes(`view ${view.name}`));
+        throwParsingError(`Entity '${view.from}' not found for view '${view.name}'`, filePath, lines, lineIndex > -1 ? lineIndex : 0);
+      }
     }
   }
 
