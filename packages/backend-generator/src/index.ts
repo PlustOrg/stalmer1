@@ -1,5 +1,5 @@
 import * as ejs from 'ejs';
-import { IApp, IRPage } from '@stalmer1/core';
+import { IApp, IRPage, IRViewField } from '@stalmer1/core';
 import { generatePrismaSchema } from './prisma';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -55,7 +55,7 @@ function generateMigrations(app: IApp, outDir: string, verbose: boolean = false)
     const migrationDir = path.join(migrationsDir, migrationDirName);
     fs.mkdirSync(migrationDir, { recursive: true });
 
-    const fields = view.fields.map(f => `  ${f.expression} as ${f.name}`).join(',\n');
+    const fields = view.fields.map((f: IRViewField) => `  ${f.expression} as ${f.name}`).join(',\n');
     const sql = `CREATE VIEW "${view.name}" AS\nSELECT\n${fields}\nFROM "${view.from}";`;
 
     fs.writeFileSync(path.join(migrationDir, 'migration.sql'), sql);

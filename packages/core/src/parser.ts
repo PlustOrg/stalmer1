@@ -1,5 +1,5 @@
 import { DSLParsingError } from './errors';
-import { IApp, IREntity, IRField, IRPage, IRConfig, IRWorkflow, IRView, IRViewField } from './ir';
+import { IApp, IREntity, IRField, IRPage, IRConfig, IRWorkflow, IRView } from './ir';
 
 function cleanLine(line: string): string {
   if (!line) return '';
@@ -286,7 +286,7 @@ function parseEntity(lines: string[], startIndex: number, name: string, filePath
 }
 
 function parseView(lines: string[], startIndex: number, name: string, filePath?: string): [IRView, number] {
-  const block: Record<string, any> = {};
+  const block: Record<string, unknown> = {};
   let i = startIndex;
   const baseIndent = getIndent(lines[i - 1]);
 
@@ -353,15 +353,15 @@ function parseView(lines: string[], startIndex: number, name: string, filePath?:
 
   const view: IRView = {
     name,
-    from: block.from,
-    fields: block.fields.map((f: any) => {
+    from: block.from as string,
+    fields: (block.fields as Array<{name?: string; type?: string; expression?: string}>).map((f) => {
       if (!f.name || !f.type || !f.expression) {
         throwParsingError(`Each field in view '${name}' must have 'name', 'type', and 'expression' properties.`, filePath, lines, startIndex - 1);
       }
       return {
-        name: f.name,
-        type: f.type,
-        expression: f.expression,
+        name: f.name as string,
+        type: f.type as string,
+        expression: f.expression as string,
       };
     }),
   };

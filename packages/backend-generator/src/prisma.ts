@@ -1,5 +1,5 @@
 // Generates a Prisma schema from IREntity[]
-import { IApp, IREntity, IRField, IRRelation, IRView } from '@stalmer1/core';
+import { IApp, IREntity, IRField, IRRelation } from '@stalmer1/core';
 
 /**
  * Generates a Prisma schema from the entities defined in the DSL
