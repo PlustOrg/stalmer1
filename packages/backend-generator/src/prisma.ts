@@ -1,13 +1,14 @@
 // Generates a Prisma schema from IREntity[]
-import { IREntity, IRField, IRRelation } from '@stalmer1/core';
+import { IApp, IREntity, IRField, IRRelation, IRView } from '@stalmer1/core';
 
 /**
  * Generates a Prisma schema from the entities defined in the DSL
- * @param entities - The list of entities from the IR
+ * @param app - The entire application IR
  * @param dbType - The database type (sqlite or postgresql)
  * @returns A string containing the Prisma schema
  */
-export function generatePrismaSchema(entities: IREntity[], dbType: 'sqlite' | 'postgresql' = 'sqlite'): string {
+export function generatePrismaSchema(app: IApp, dbType: 'sqlite' | 'postgresql' = 'sqlite'): string {
+  const { entities, views } = app;
   // Generate the Prisma schema header
   let schema = `// This file is generated - DO NOT EDIT\n\n`;
   
@@ -52,6 +53,23 @@ export function generatePrismaSchema(entities: IREntity[], dbType: 'sqlite' | 'p
     }
     
     schema += `}\n\n`;
+  }
+
+  // Generate models from views
+  if (views) {
+    for (const view of views) {
+      schema += `/// @readonly\n`;
+      schema += `model ${view.name} {\n`;
+
+      // Process view fields
+      for (const field of view.fields) {
+        const prismaType = mapType(field.type);
+        schema += `  ${field.name} ${prismaType}\n`;
+      }
+
+      schema += `\n  @@map(name: null) /// @db.view\n`;
+      schema += `}\n\n`;
+    }
   }
   
   return schema;

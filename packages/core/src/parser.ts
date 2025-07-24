@@ -1,5 +1,5 @@
 import { DSLParsingError } from './errors';
-import { IApp, IREntity, IRField, IRPage, IRConfig, IRWorkflow } from './ir';
+import { IApp, IREntity, IRField, IRPage, IRConfig, IRWorkflow, IRView, IRViewField } from './ir';
 
 function cleanLine(line: string): string {
   if (!line) return '';
@@ -285,13 +285,97 @@ function parseEntity(lines: string[], startIndex: number, name: string, filePath
   return [entity, i - 1];
 }
 
+function parseView(lines: string[], startIndex: number, name: string, filePath?: string): [IRView, number] {
+  const block: Record<string, any> = {};
+  let i = startIndex;
+  const baseIndent = getIndent(lines[i - 1]);
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const indent = getIndent(line);
+
+    if (indent <= baseIndent) {
+      if (cleanLine(line) === '}') {
+        i++;
+      }
+      break;
+    }
+
+    const cleaned = cleanLine(line);
+    if (!cleaned) {
+      i++;
+      continue;
+    }
+
+    const parts = cleaned.split(':');
+    const key = parts[0].trim();
+    const value = parts.slice(1).join(':').trim();
+
+    if (key === 'fields') {
+      let fullArray = value;
+      let j = i;
+      while (!fullArray.trim().endsWith(']') && j < lines.length - 1) {
+        j++;
+        fullArray += ' ' + lines[j].trim();
+      }
+      i = j;
+
+      const arrayContent = fullArray.slice(fullArray.indexOf('[') + 1, fullArray.lastIndexOf(']')).trim();
+      const objects = [];
+      const objectRegex = /{\s*([^}]+)\s*}/g;
+      let match;
+      while ((match = objectRegex.exec(arrayContent)) !== null) {
+        const objectContent = match[1];
+        const obj: Record<string, unknown> = {};
+        const pairRegex = /(\w+)\s*:\s*([^,]+)/g;
+        let pairMatch;
+        while ((pairMatch = pairRegex.exec(objectContent)) !== null) {
+          const k = pairMatch[1].trim();
+          const v = pairMatch[2].trim();
+          obj[k] = parseValue(v);
+        }
+        objects.push(obj);
+      }
+      block[key] = objects;
+    } else {
+      block[key] = parseValue(value);
+    }
+    i++;
+  }
+
+  if (!block.from) {
+    throwParsingError(`View '${name}' must have a 'from' property.`, filePath, lines, startIndex - 1);
+  }
+
+  if (!block.fields || !Array.isArray(block.fields)) {
+    throwParsingError(`View '${name}' must have a 'fields' property that is an array.`, filePath, lines, startIndex - 1);
+  }
+
+  const view: IRView = {
+    name,
+    from: block.from,
+    fields: block.fields.map((f: any) => {
+      if (!f.name || !f.type || !f.expression) {
+        throwParsingError(`Each field in view '${name}' must have 'name', 'type', and 'expression' properties.`, filePath, lines, startIndex - 1);
+      }
+      return {
+        name: f.name,
+        type: f.type,
+        expression: f.expression,
+      };
+    }),
+  };
+
+  return [view, i - 1];
+}
+
 export function parseDSL(dsl: string, filePath?: string): IApp {
   const lines = dsl.split('\n');
   if (!dsl.trim() || lines.every(line => !line.trim() || line.trim().startsWith('//'))) {
     throw new DSLParsingError('DSL file is empty or contains only comments. At least one entity block is required.', filePath);
   }
   
-  const app: IApp = { name: 'App', entities: [], pages: [], workflows: [], config: { enums: {} } };
+  const app: IApp = { name: 'App', entities: [], views: [], pages: [], workflows: [], config: { enums: {} } };
   let i = 0;
 
   while (i < lines.length) {
@@ -301,7 +385,7 @@ export function parseDSL(dsl: string, filePath?: string): IApp {
       continue;
     }
 
-    const match = line.match(/^(entity|page|workflow|config|enum)\s+(\w+)\s*\{/);
+    const match = line.match(/^(entity|page|workflow|config|enum|view)\s+(\w+)\s*\{/);
     if (match) {
       const [, type, name] = match;
       let block, endIndex = i;
@@ -309,6 +393,11 @@ export function parseDSL(dsl: string, filePath?: string): IApp {
       if (type === 'entity') {
         [block, endIndex] = parseEntity(lines, i + 1, name, filePath);
         app.entities.push(block as IREntity);
+      } else if (type === 'view') {
+        [block, endIndex] = parseView(lines, i + 1, name, filePath);
+        if (app.views) {
+          app.views.push(block as IRView);
+        }
       } else {
         [block, endIndex] = parseBlock(lines, i + 1, filePath);
         switch (type) {
@@ -402,6 +491,7 @@ export function parseDSL(dsl: string, filePath?: string): IApp {
 // Main validation function
 export function validateIR(app: IApp, filePath?: string, lines: string[] = []) {
   const entityNames = new Set(app.entities.map(e => e.name));
+  const viewNames = new Set(app.views?.map(v => v.name) ?? []);
   const enumNames = new Set(Object.keys(app.config?.enums || {}));
 
   // Validate Relationships
@@ -427,11 +517,21 @@ export function validateIR(app: IApp, filePath?: string, lines: string[] = []) {
     }
   }
 
+  // Validate Views
+  if (app.views) {
+    for (const view of app.views) {
+      if (!entityNames.has(view.from)) {
+        const lineIndex = lines.findIndex(l => l.includes(`view ${view.name}`));
+        throwParsingError(`Entity '${view.from}' not found for view '${view.name}'`, filePath, lines, lineIndex > -1 ? lineIndex : 0);
+      }
+    }
+  }
+
   // Validate Page Entities
   for (const page of app.pages) {
-    if (page.entity && !entityNames.has(page.entity)) {
+    if (page.entity && !entityNames.has(page.entity) && !viewNames.has(page.entity)) {
       const lineIndex = lines.findIndex(l => l.includes(`page ${page.name}`));
-      throwParsingError(`Entity '${page.entity}' not found for page '${page.name}'`, filePath, lines, lineIndex > -1 ? lineIndex : 0);
+      throwParsingError(`Entity or View '${page.entity}' not found for page '${page.name}'`, filePath, lines, lineIndex > -1 ? lineIndex : 0);
     }
   }
 
