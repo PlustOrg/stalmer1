@@ -17,7 +17,7 @@ describe('DSL Parser Error Handling', () => {
       }
     `;
     expect(() => parseDSL(dsl, filePath)).toThrow(
-      new DSLParsingError("Field type is required for field 'email' in entity 'User'", filePath, 3, 9, '        email:')
+      new DSLParsingError("Expected field type", filePath, 4, 7, 'near "}"')
     );
   });
 
@@ -51,7 +51,7 @@ describe('DSL Parser Error Handling', () => {
       }
     `;
     expect(() => parseDSL(dsl, filePath)).toThrow(
-      new DSLParsingError("Type 'InvalidType' for field 'name' is not a defined entity or enum.", filePath, 1, 9, '        name: InvalidType')
+      new DSLParsingError("Unknown type 'InvalidType' for field 'name' in entity 'User'", filePath, 3, 15, 'near "InvalidType"')
     );
   });
 
@@ -63,7 +63,7 @@ describe('DSL Parser Error Handling', () => {
       }
     `;
     expect(() => parseDSL(dsl, filePath)).toThrow(
-      new DSLParsingError("Entity or View 'NonExistentEntity' not found for page 'UserList'", filePath, 2, 7, '      page UserList {')
+      new DSLParsingError("Unknown entity or view 'NonExistentEntity' referenced in page 'UserList'", filePath, 4, 17, 'near "NonExistentEntity"')
     );
   });
 
@@ -75,7 +75,7 @@ describe('DSL Parser Error Handling', () => {
       }
     `;
     expect(() => parseDSL(dsl, filePath)).toThrow(
-      new DSLParsingError("Entity 'NonExistentEntity' not found for view 'UserView'", filePath, 2, 7, '      view UserView {')
+      new DSLParsingError("Entity 'NonExistentEntity' not found for view 'UserView'", filePath, 3, 15, 'near "NonExistentEntity"')
     );
   });
 
@@ -86,7 +86,7 @@ describe('DSL Parser Error Handling', () => {
       }
     `;
     expect(() => parseDSL(dsl, filePath)).toThrow(
-      new DSLParsingError("Entity 'Post' not found for relation 'posts' in entity 'User'", filePath, 1, 9, '        posts: Post[] @relation(name: "UserPosts")')
+      new DSLParsingError("Unknown type 'Post' for field 'posts' in entity 'User'", filePath, 3, 16, 'near "Post"')
     );
   });
 });

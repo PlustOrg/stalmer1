@@ -6,6 +6,7 @@ config app {
 
 config auth {
   provider: jwt
+  userEntity: User
   props: {
     clerkPublishableKey: "test-key"
     auth0Domain: "test.auth0.com"
