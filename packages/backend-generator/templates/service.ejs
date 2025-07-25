@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 <% const hasPasswordField = entity.fields.some(f => f.isPassword); %>
 <% if (hasPasswordField) { %>import * as bcrypt from 'bcrypt';<% } %>
 import { <%= entity.name %> } from '@prisma/client';
-<% const virtualFields = entity.fields.filter(f => f.isVirtual); %>
+<% const virtualFields = entity.fields.filter(f => f.isVirtual && f.virtualFrom); %>
 <% if (virtualFields.length > 0) { %>
 <% const resolverFile = virtualFields[0].virtualFrom.split('#')[0].replace('.ts', ''); %>
 import { <% const functionNames = virtualFields.map(f => f.virtualFrom.split('#')[1]); %><%= functionNames.join(', ') %> } from './<%= resolverFile %>';
@@ -17,7 +17,9 @@ export class <%= entity.name %>Service {
     if (!entity) return null;
     const result = { ...entity };
     <% for (const field of virtualFields) { %>
+    <% if (field.virtualFrom) { %>
     result['<%= field.name %>'] = await <%= field.virtualFrom.split('#')[1] %>(entity);
+    <% } %>
     <% } %>
     return result;
   }

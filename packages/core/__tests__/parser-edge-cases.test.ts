@@ -1,4 +1,4 @@
-import { parseDSL } from '../src/parser';
+import { parseDSL } from '../src/parser/index';
 import { IRPage } from '../src/ir';
 
 describe('DSL Parser - Edge Cases', () => {

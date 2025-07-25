@@ -1,5 +1,5 @@
 
-import { parseDSL } from '../src/parser';
+import { parseDSL } from '../src/parser/index';
 import { IApp } from '../src/ir';
 
 const dsl = `

@@ -1,0 +1,789 @@
+/**
+ * Parser for the DSL
+ * 
+ * The parser consumes tokens from the lexer and produces an AST.
+ * It should not perform any semantic validation, focusing only on syntax.
+ */
+import { DSLParsingError } from '../errors';
+import * as AST from './ast';
+import { Token, TokenType } from './lexer';
+
+export class Parser {
+  private tokens: Token[];
+  private current = 0;
+  private filePath?: string;
+
+  constructor(tokens: Token[], filePath?: string) {
+    this.tokens = tokens;
+    this.filePath = filePath;
+  }
+
+  /**
+   * Parse the token stream into an AST
+   */
+  parse(): AST.SourceFileNode {
+    const statements: AST.StatementNode[] = [];
+
+    while (!this.isAtEnd()) {
+      try {
+        statements.push(this.parseStatement());
+      } catch (error) {
+        if (error instanceof DSLParsingError) {
+          throw error;
+        }
+        throw new DSLParsingError(
+          (error as Error).message,
+          this.filePath,
+          this.peek().position.line,
+          this.peek().position.column
+        );
+      }
+    }
+
+    return {
+      kind: 'SourceFile',
+      statements,
+      position: {
+        start: statements.length > 0 
+          ? statements[0].position.start
+          : { line: 1, column: 1 },
+        end: statements.length > 0
+          ? statements[statements.length - 1].position.end
+          : { line: 1, column: 1 }
+      }
+    };
+  }
+
+  private parseStatement(): AST.StatementNode {
+    const token = this.peek();
+    
+    if (token.type === TokenType.KEYWORD_ENTITY) {
+      return this.parseEntityDeclaration();
+    } else if (token.type === TokenType.KEYWORD_VIEW) {
+      return this.parseViewDeclaration();
+    } else if (token.type === TokenType.KEYWORD_PAGE) {
+      return this.parsePageDeclaration();
+    } else if (token.type === TokenType.KEYWORD_WORKFLOW) {
+      return this.parseWorkflowDeclaration();
+    } else if (token.type === TokenType.KEYWORD_CONFIG) {
+      return this.parseConfigDeclaration();
+    } else if (token.type === TokenType.KEYWORD_ENUM) {
+      return this.parseEnumDeclaration();
+    } else {
+      throw this.error(token, `Unexpected token "${token.value}", expected a declaration keyword`);
+    }
+  }
+
+  private parseEntityDeclaration(): AST.EntityDeclarationNode {
+    const startToken = this.consume(TokenType.KEYWORD_ENTITY, 'Expected "entity"');
+    const nameToken = this.consume(TokenType.IDENTIFIER, 'Expected entity name');
+    this.consume(TokenType.BRACE_OPEN, 'Expected "{" after entity name');
+    
+    const members: AST.EntityMemberNode[] = [];
+    
+    // Parse entity members (fields and relations)
+    while (this.peek().type !== TokenType.BRACE_CLOSE && !this.isAtEnd()) {
+      if (this.peek().type !== TokenType.IDENTIFIER) {
+        this.advance(); // Skip any unexpected tokens
+        continue;
+      }
+
+      // All field declarations are handled the same way now
+      // Relations are parsed as field declarations with relation attributes
+      members.push(this.parseFieldDeclaration());
+    }
+
+    const endToken = this.consume(TokenType.BRACE_CLOSE, 'Expected "}" after entity body');
+
+    return {
+      kind: 'EntityDeclaration',
+      name: {
+        kind: 'Identifier',
+        name: nameToken.value,
+        position: {
+          start: nameToken.position,
+          end: { 
+            line: nameToken.position.line, 
+            column: nameToken.position.column + nameToken.value.length 
+          }
+        }
+      },
+      members,
+      position: {
+        start: startToken.position,
+        end: endToken.position
+      }
+    };
+  }
+
+  private parseFieldDeclaration(): AST.FieldDeclarationNode {
+    const nameToken = this.consume(TokenType.IDENTIFIER, 'Expected field name');
+    
+    if (!this.check(TokenType.COLON)) {
+      throw this.error(this.peek(), 'Expected ":" after field name');
+    }
+    
+    this.advance(); // Consume the colon
+    
+    // Parse the type
+    const typeToken = this.consume(TokenType.IDENTIFIER, 'Expected field type');
+    
+    // Check if it's an array type
+    const isArray = this.peek().value === '[]';
+    if (isArray) {
+      this.advance(); // Consume the [] token
+    }
+    
+    const type: AST.TypeNode = {
+      kind: 'Type',
+      name: typeToken.value,
+      isArray,
+      position: {
+        start: typeToken.position,
+        end: { 
+          line: typeToken.position.line, 
+          column: typeToken.position.column + typeToken.value.length + (isArray ? 2 : 0)
+        }
+      }
+    };
+    
+    // Parse attributes
+    const attributes: AST.AttributeNode[] = [];
+    // Check for attributes until we hit a closing brace or another field identifier followed by a colon
+    while (!this.isAtEnd() && this.peek().type !== TokenType.BRACE_CLOSE &&
+           !(this.peek().type === TokenType.IDENTIFIER && 
+             this.peekNext() !== undefined && this.peekNext()!.type === TokenType.COLON)) {
+      
+      // Parse attribute
+      if (this.peek().value === 'primaryKey' || 
+          this.peek().value === 'unique' || 
+          this.peek().value === 'optional' ||
+          this.peek().value === 'readonly' || 
+          this.peek().value === 'isPassword' ||
+          this.peek().value === 'isLongText' ||
+          this.peek().value === 'isDecimal' ||
+          this.peek().value === 'isDateOnly') {
+        
+        const attrToken = this.advance();
+        attributes.push({
+          kind: 'Attribute',
+          name: attrToken.value,
+          position: {
+            start: attrToken.position,
+            end: { 
+              line: attrToken.position.line, 
+              column: attrToken.position.column + attrToken.value.length 
+            }
+          }
+        });
+      } 
+      // Parse attribute with arguments (like default or validate)
+      else if (this.peek().value === 'default' || this.peek().value === 'validate') {
+        const attrToken = this.advance();
+        this.consume(TokenType.PARENTHESIS_OPEN, `Expected "(" after ${attrToken.value}`);
+        
+        // Parse the argument value
+        const argToken = this.advance(); // This could be a string, number, etc.
+        const argValue = this.parseValue(argToken);
+        
+        this.consume(TokenType.PARENTHESIS_CLOSE, `Expected ")" after ${attrToken.value} argument`);
+        
+        attributes.push({
+          kind: 'Attribute',
+          name: attrToken.value,
+          arguments: [argValue],
+          position: {
+            start: attrToken.position,
+            end: this.previous().position
+          }
+        });
+      }
+      // Parse directive (like @virtual or @relation)
+      else if (this.peek().type === TokenType.AT_SIGN) {
+        const atToken = this.advance(); // @
+        const directiveToken = this.consume(TokenType.IDENTIFIER, 'Expected directive name after @');
+        
+        if (directiveToken.value === 'virtual') {
+          this.consume(TokenType.PARENTHESIS_OPEN, 'Expected "(" after @virtual');
+          const fromToken = this.consume(TokenType.IDENTIFIER, 'Expected "from" in @virtual directive');
+          
+          if (fromToken.value !== 'from') {
+            throw this.error(fromToken, 'Expected "from" in @virtual directive');
+          }
+          
+          this.consume(TokenType.COLON, 'Expected ":" after "from"');
+          const fromValue = this.consume(TokenType.STRING_LITERAL, 'Expected string for virtual field source');
+          this.consume(TokenType.PARENTHESIS_CLOSE, 'Expected ")" after @virtual directive');
+          
+          attributes.push({
+            kind: 'Attribute',
+            name: 'virtual',
+            arguments: [{
+              kind: 'StringLiteral',
+              value: fromValue.value,
+              position: {
+                start: fromValue.position,
+                end: { 
+                  line: fromValue.position.line, 
+                  column: fromValue.position.column + fromValue.value.length + 2 // +2 for quotes
+                }
+              }
+            }],
+            position: {
+              start: atToken.position,
+              end: this.previous().position
+            }
+          });
+        } else if (directiveToken.value === 'relation') {
+          // Handle @relation directive
+          let relationName: string | undefined;
+          
+          // Check for relation name in parentheses
+          if (this.peek().type === TokenType.PARENTHESIS_OPEN) {
+            this.advance(); // Consume (
+            this.consume(TokenType.IDENTIFIER, 'Expected "name" in relation directive');
+            this.consume(TokenType.COLON, 'Expected ":" after "name"');
+            const nameValueToken = this.consume(TokenType.STRING_LITERAL, 'Expected string for relation name');
+            relationName = nameValueToken.value;
+            this.consume(TokenType.PARENTHESIS_CLOSE, 'Expected ")" after relation name');
+          }
+          
+          attributes.push({
+            kind: 'Attribute',
+            name: 'relation',
+            arguments: [{
+              kind: 'StringLiteral',
+              value: relationName || '',
+              position: {
+                start: directiveToken.position,
+                end: this.previous().position
+              }
+            }],
+            position: {
+              start: atToken.position,
+              end: this.previous().position
+            }
+          });
+        } else {
+          // Skip unknown directive
+          while (!this.isAtEnd() && 
+                 this.peek().type !== TokenType.PARENTHESIS_CLOSE &&
+                 this.peek().type !== TokenType.BRACE_CLOSE) {
+            this.advance();
+          }
+          if (this.peek().type === TokenType.PARENTHESIS_CLOSE) {
+            this.advance();
+          }
+        }
+      } else {
+        // Skip any other unexpected tokens
+        this.advance();
+      }
+    }
+    
+    return {
+      kind: 'FieldDeclaration',
+      name: {
+        kind: 'Identifier',
+        name: nameToken.value,
+        position: {
+          start: nameToken.position,
+          end: { 
+            line: nameToken.position.line, 
+            column: nameToken.position.column + nameToken.value.length 
+          }
+        }
+      },
+      type,
+      attributes,
+      position: {
+        start: nameToken.position,
+        end: attributes.length > 0 
+          ? attributes[attributes.length - 1].position.end 
+          : type.position.end
+      }
+    };
+  }
+
+  private parseViewDeclaration(): AST.ViewDeclarationNode {
+    const startToken = this.consume(TokenType.KEYWORD_VIEW, 'Expected "view"');
+    const nameToken = this.consume(TokenType.IDENTIFIER, 'Expected view name');
+    this.consume(TokenType.BRACE_OPEN, 'Expected "{" after view name');
+    
+    // Parse view properties
+    const fields: AST.ViewFieldNode[] = [];
+    const properties = this.parseProperties();
+    const endToken = this.consume(TokenType.BRACE_CLOSE, 'Expected "}" after view body');
+    
+    // Extract specific properties
+    let fromEntity = '';
+    for (const prop of properties) {
+      if (prop.name === 'from' && prop.value.kind === 'Identifier') {
+        fromEntity = prop.value.name;
+      } else if (prop.name === 'fields' && prop.value.kind === 'ArrayLiteral') {
+        // Extract fields from the array
+        const fieldArray = prop.value.elements;
+        for (const field of fieldArray) {
+          if (field.kind === 'ObjectLiteral') {
+            const name = field.properties['name']?.kind === 'StringLiteral' ? field.properties['name'].value : '';
+            const type = field.properties['type']?.kind === 'Identifier' ? field.properties['type'].name : '';
+            const expression = field.properties['expression']?.kind === 'StringLiteral' ? field.properties['expression'].value : '';
+            
+            if (name && type && expression) {
+              fields.push({
+                kind: 'ViewField',
+                name: {
+                  kind: 'Identifier',
+                  name,
+                  position: field.position
+                },
+                expression,
+                position: field.position
+              });
+            }
+          }
+        }
+      }
+    }
+    
+    return {
+      kind: 'ViewDeclaration',
+      name: {
+        kind: 'Identifier',
+        name: nameToken.value,
+        position: {
+          start: nameToken.position,
+          end: { line: nameToken.position.line, column: nameToken.position.column + nameToken.value.length }
+        }
+      },
+      fromEntity: {
+        kind: 'Identifier',
+        name: fromEntity,
+        position: { start: { line: 0, column: 0 }, end: { line: 0, column: 0 } } // Placeholder
+      },
+      fields,
+      properties,
+      position: {
+        start: startToken.position,
+        end: endToken.position
+      }
+    };
+  }
+
+  private parsePageDeclaration(): AST.PageDeclarationNode {
+    const startToken = this.consume(TokenType.KEYWORD_PAGE, 'Expected "page"');
+    const nameToken = this.consume(TokenType.IDENTIFIER, 'Expected page name');
+    this.consume(TokenType.BRACE_OPEN, 'Expected "{" after page name');
+    
+    // Parse page properties
+    const properties = this.parseProperties();
+    const endToken = this.consume(TokenType.BRACE_CLOSE, 'Expected "}" after page body');
+    
+    // Extract specific properties
+    let entityName = '';
+    for (const prop of properties) {
+      // Handle both 'entity' and 'KEYWORD_ENTITY' property names
+      if ((prop.name === 'entity' || prop.name === 'KEYWORD_ENTITY') && 
+          prop.value.kind === 'Identifier') {
+        entityName = prop.value.name;
+      }
+    }
+    
+    return {
+      kind: 'PageDeclaration',
+      name: {
+        kind: 'Identifier',
+        name: nameToken.value,
+        position: {
+          start: nameToken.position,
+          end: { line: nameToken.position.line, column: nameToken.position.column + nameToken.value.length }
+        }
+      },
+      entity: {
+        kind: 'Identifier',
+        name: entityName,
+        position: { start: { line: 0, column: 0 }, end: { line: 0, column: 0 } } // Placeholder
+      },
+      properties,
+      position: {
+        start: startToken.position,
+        end: endToken.position
+      }
+    };
+  }
+
+  private parseWorkflowDeclaration(): AST.WorkflowDeclarationNode {
+    const startToken = this.consume(TokenType.KEYWORD_WORKFLOW, 'Expected "workflow"');
+    const nameToken = this.consume(TokenType.IDENTIFIER, 'Expected workflow name');
+    this.consume(TokenType.BRACE_OPEN, 'Expected "{" after workflow name');
+    
+    // Parse workflow properties
+    const properties = this.parseProperties();
+    const endToken = this.consume(TokenType.BRACE_CLOSE, 'Expected "}" after workflow body');
+    
+    return {
+      kind: 'WorkflowDeclaration',
+      name: {
+        kind: 'Identifier',
+        name: nameToken.value,
+        position: {
+          start: nameToken.position,
+          end: { line: nameToken.position.line, column: nameToken.position.column + nameToken.value.length }
+        }
+      },
+      properties,
+      position: {
+        start: startToken.position,
+        end: endToken.position
+      }
+    };
+  }
+
+  private parseConfigDeclaration(): AST.ConfigDeclarationNode {
+    const startToken = this.consume(TokenType.KEYWORD_CONFIG, 'Expected "config"');
+    
+    let nameToken;
+    // Check if the next token is an identifier (config name) or a brace open (anonymous config)
+    if (this.peek().type === TokenType.IDENTIFIER) {
+      nameToken = this.advance();
+      this.consume(TokenType.BRACE_OPEN, 'Expected "{" after config name');
+    } else {
+      // Anonymous config (no name)
+      nameToken = { type: TokenType.IDENTIFIER, value: '', position: startToken.position };
+      this.consume(TokenType.BRACE_OPEN, 'Expected "{" after config');
+    }
+    
+    // Parse config properties
+    const properties = this.parseProperties();
+    const endToken = this.consume(TokenType.BRACE_CLOSE, 'Expected "}" after config body');
+    
+    return {
+      kind: 'ConfigDeclaration',
+      name: {
+        kind: 'Identifier',
+        name: nameToken.value,
+        position: {
+          start: nameToken.position,
+          end: { line: nameToken.position.line, column: nameToken.position.column + nameToken.value.length }
+        }
+      },
+      properties,
+      position: {
+        start: startToken.position,
+        end: endToken.position
+      }
+    };
+  }
+
+  private parseEnumDeclaration(): AST.EnumDeclarationNode {
+    const startToken = this.consume(TokenType.KEYWORD_ENUM, 'Expected "enum"');
+    const nameToken = this.consume(TokenType.IDENTIFIER, 'Expected enum name');
+    this.consume(TokenType.BRACE_OPEN, 'Expected "{" after enum name');
+    
+    // Parse enum values
+    const values: AST.EnumValueNode[] = [];
+    
+    while (this.peek().type !== TokenType.BRACE_CLOSE && !this.isAtEnd()) {
+      if (this.peek().type === TokenType.IDENTIFIER) {
+        const valueToken = this.advance();
+        
+        values.push({
+          kind: 'EnumValue',
+          name: {
+            kind: 'Identifier',
+            name: valueToken.value,
+            position: {
+              start: valueToken.position,
+              end: { line: valueToken.position.line, column: valueToken.position.column + valueToken.value.length }
+            }
+          },
+          position: {
+            start: valueToken.position,
+            end: { line: valueToken.position.line, column: valueToken.position.column + valueToken.value.length }
+          }
+        });
+        
+        // Skip optional comma or colon separators
+        if (this.peek().type === TokenType.COLON || this.peek().type === TokenType.COMMA) {
+          this.advance();
+        }
+      } else {
+        this.advance(); // Skip unexpected tokens
+      }
+    }
+    
+    const endToken = this.consume(TokenType.BRACE_CLOSE, 'Expected "}" after enum body');
+    
+    return {
+      kind: 'EnumDeclaration',
+      name: {
+        kind: 'Identifier',
+        name: nameToken.value,
+        position: {
+          start: nameToken.position,
+          end: { line: nameToken.position.line, column: nameToken.position.column + nameToken.value.length }
+        }
+      },
+      values,
+      position: {
+        start: startToken.position,
+        end: endToken.position
+      }
+    };
+  }
+
+  private parseProperties(): AST.PropertyNode[] {
+    const properties: AST.PropertyNode[] = [];
+    
+    while (this.peek().type !== TokenType.BRACE_CLOSE && !this.isAtEnd()) {
+      // Allow keywords as property names (especially for 'entity' in page declarations)
+      if (this.peek().type !== TokenType.IDENTIFIER && 
+          !this.peek().type.startsWith('KEYWORD_')) {
+        this.advance(); // Skip unexpected tokens
+        continue;
+      }
+      
+      const nameToken = this.advance();
+      this.consume(TokenType.COLON, `Expected ":" after property name "${nameToken.value}"`);
+      
+      const name = nameToken.value;
+      
+      // Handle different property value types
+      // String literals, identifiers, arrays, etc.
+      let value: AST.ValueNode;
+      
+      if (this.peek().type === TokenType.IDENTIFIER ||
+          this.peek().type === TokenType.STRING_LITERAL ||
+          this.peek().type === TokenType.NUMBER_LITERAL ||
+          this.peek().type === TokenType.BOOLEAN_LITERAL ||
+          this.peek().type === TokenType.BRACKET_OPEN ||
+          this.peek().type === TokenType.BRACE_OPEN) {
+        const valueToken = this.advance();
+        const value = this.parseValue(valueToken);
+        
+        properties.push({
+          kind: 'Property',
+          name,
+          value,
+          position: {
+            start: nameToken.position,
+            end: value.position.end
+          }
+        });
+      }
+    }
+    
+    return properties;
+  }
+
+  private parseValue(token: Token): AST.ValueNode {
+    // If the token is already consumed, use the current token
+    const currentToken = token;
+    
+    switch (currentToken.type) {
+      case TokenType.STRING_LITERAL:
+        this.advance(); // Consume the token
+        return {
+          kind: 'StringLiteral',
+          value: currentToken.value,
+          position: {
+            start: currentToken.position,
+            end: { ...currentToken.position, column: currentToken.position.column + currentToken.value.length + 2 } // +2 for quotes
+          }
+        };
+        
+      case TokenType.NUMBER_LITERAL:
+        this.advance(); // Consume the token
+        return {
+          kind: 'NumberLiteral',
+          value: parseFloat(currentToken.value),
+          position: {
+            start: currentToken.position,
+            end: { ...currentToken.position, column: currentToken.position.column + currentToken.value.length }
+          }
+        };
+        
+      case TokenType.BOOLEAN_LITERAL:
+        this.advance(); // Consume the token
+        return {
+          kind: 'BooleanLiteral',
+          value: currentToken.value === 'true',
+          position: {
+            start: currentToken.position,
+            end: { ...currentToken.position, column: currentToken.position.column + currentToken.value.length }
+          }
+        };
+        
+      case TokenType.BRACKET_OPEN:
+        this.advance(); // Consume the token
+        return this.parseArrayLiteral(currentToken);
+        
+      case TokenType.BRACE_OPEN:
+        this.advance(); // Consume the token
+        return this.parseObjectLiteral(currentToken);
+        
+      case TokenType.IDENTIFIER:
+        this.advance(); // Consume the token
+        return {
+          kind: 'Identifier',
+          name: currentToken.value,
+          position: {
+            start: currentToken.position,
+            end: { ...currentToken.position, column: currentToken.position.column + currentToken.value.length }
+          }
+        };
+        
+      default:
+        throw this.error(currentToken, `Unexpected token for value: ${currentToken.value}`);
+    }
+  }
+  
+  private parseArrayLiteral(openBracketToken: Token): AST.ArrayLiteralNode {
+    const elements: AST.ValueNode[] = [];
+    
+    // Handle empty arrays
+    if (this.peek().type === TokenType.BRACKET_CLOSE) {
+      const closeBracketToken = this.advance();
+      return {
+        kind: 'ArrayLiteral',
+        elements: [],
+        position: {
+          start: openBracketToken.position,
+          end: closeBracketToken.position
+        }
+      };
+    }
+    
+    // Parse array elements
+    while (this.peek().type !== TokenType.BRACKET_CLOSE && !this.isAtEnd()) {
+      const valueToken = this.advance();
+      elements.push(this.parseValue(valueToken));
+      
+      // Check for comma separator
+      if (this.peek().type === TokenType.COMMA) {
+        this.advance();
+      }
+    }
+    
+    const closeBracketToken = this.consume(TokenType.BRACKET_CLOSE, 'Expected "]" after array elements');
+    
+    return {
+      kind: 'ArrayLiteral',
+      elements,
+      position: {
+        start: openBracketToken.position,
+        end: closeBracketToken.position
+      }
+    };
+  }
+  
+  private parseObjectLiteral(openBraceToken: Token): AST.ObjectLiteralNode {
+    const properties: Record<string, AST.ValueNode> = {};
+    
+    // Handle empty objects
+    if (this.peek().type === TokenType.BRACE_CLOSE) {
+      const closeBraceToken = this.advance();
+      return {
+        kind: 'ObjectLiteral',
+        properties,
+        position: {
+          start: openBraceToken.position,
+          end: closeBraceToken.position
+        }
+      };
+    }
+    
+    // Parse object properties
+    while (this.peek().type !== TokenType.BRACE_CLOSE && !this.isAtEnd()) {
+      // Allow keywords as property names
+      let keyToken;
+      if (this.peek().type.startsWith('KEYWORD_') || this.peek().type === TokenType.IDENTIFIER) {
+        keyToken = this.advance();
+      } else {
+        keyToken = this.consume(TokenType.IDENTIFIER, 'Expected property name');
+      }
+      
+      this.consume(TokenType.COLON, `Expected ":" after property name "${keyToken.value}"`);
+      
+      // Parse the value - don't advance here, let parseValue handle it
+      const value = this.parseValue(this.peek());
+      
+      properties[keyToken.value] = value;
+      
+      // Check for comma separator
+      if (this.peek().type === TokenType.COMMA) {
+        this.advance();
+      }
+    }
+    
+    const closeBraceToken = this.consume(TokenType.BRACE_CLOSE, 'Expected "}" after object properties');
+    
+    return {
+      kind: 'ObjectLiteral',
+      properties,
+      position: {
+        start: openBraceToken.position,
+        end: closeBraceToken.position
+      }
+    };
+  }
+
+  private advance(): Token {
+    if (!this.isAtEnd()) {
+      this.current++;
+    }
+    return this.previous();
+  }
+  
+  private consume(type: TokenType, errorMessage: string): Token {
+    if (this.check(type)) {
+      return this.advance();
+    }
+    
+    throw this.error(this.peek(), errorMessage);
+  }
+  
+  private check(type: TokenType): boolean {
+    if (this.isAtEnd()) {
+      return false;
+    }
+    return this.peek().type === type;
+  }
+  
+  private isAtEnd(): boolean {
+    return this.peek().type === TokenType.EOF;
+  }
+  
+  private peek(): Token {
+    return this.tokens[this.current];
+  }
+  
+  private peekNext(): Token | undefined {
+    if (this.current + 1 >= this.tokens.length) {
+      return undefined;
+    }
+    return this.tokens[this.current + 1];
+  }
+  
+  private previous(): Token {
+    return this.tokens[this.current - 1];
+  }
+  
+  private error(token: Token, message: string): Error {
+    return new DSLParsingError(
+      message,
+      this.filePath,
+      token.position.line,
+      token.position.column,
+      `near "${token.value}"`
+    );
+  }
+}
+
+/**
+ * Parse a DSL string into an AST
+ */
+export function parse(tokens: Token[], filePath?: string): AST.SourceFileNode {
+  const parser = new Parser(tokens, filePath);
+  return parser.parse();
+}
