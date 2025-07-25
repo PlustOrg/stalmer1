@@ -50,6 +50,7 @@ export interface ViewDeclarationNode extends NodeBase {
 export interface ViewFieldNode extends NodeBase {
   kind: 'ViewField';
   name: IdentifierNode;
+  type?: string;
   expression: string;
 }
 
@@ -116,7 +117,8 @@ export type ValueNode =
   | BooleanLiteralNode
   | IdentifierNode
   | ArrayLiteralNode
-  | ObjectLiteralNode;
+  | ObjectLiteralNode
+  | FunctionCallNode;
 
 export interface StringLiteralNode extends NodeBase {
   kind: 'StringLiteral';
@@ -146,4 +148,10 @@ export interface ArrayLiteralNode extends NodeBase {
 export interface ObjectLiteralNode extends NodeBase {
   kind: 'ObjectLiteral';
   properties: Record<string, ValueNode>;
+}
+
+export interface FunctionCallNode extends NodeBase {
+  kind: 'FunctionCall';
+  name: string;
+  arguments: ValueNode[];
 }

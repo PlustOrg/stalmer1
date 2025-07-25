@@ -80,6 +80,8 @@ export interface IRConfig {
     guards?: Record<string, string[]>;
     props?: Record<string, string | number | boolean | null>; // Additional auth properties like apiKeys, domains, etc.
   };
+  // Allow for dynamic properties
+  [key: string]: any;
   integrations?: {
     email?: {
       provider: string;
