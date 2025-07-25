@@ -26,7 +26,7 @@ export function parseDSL(dslText: string, filePath?: string): IApp {
     const tokens: Token[] = tokenize(dslText, filePath);
     
     // Step 2: Parse tokens into an AST
-    const ast: AST.SourceFileNode = parse(tokens, filePath);
+    const ast: AST.SourceFileNode = parse(tokens, filePath, dslText);
     
     // Step 3: Validate the AST
     const diagnostics: Diagnostic[] = validate(ast, filePath);
