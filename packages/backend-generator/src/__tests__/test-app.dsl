@@ -1,19 +1,19 @@
 
 entity User {
-  name: String
+  name: String,
   email: String unique
 }
 
 entity Post {
-  title: String
-  content: Text
-  published: Boolean default(false)
+  title: String,
+  content: Text,
+  published: Boolean default(false),
   author: User @relation(name: "UserPosts")
 }
 
 page Users {
-  type: table
-  entity: User
+  type: table,
+  entity: User,
   columns: [
     { field: "name", label: "Name" },
     { field: "email", label: "Email" }
@@ -21,20 +21,20 @@ page Users {
 }
 
 page UserForm {
-  type: form
+  type: form,
   entity: User
 }
 
 page Posts {
-    type: table
-    entity: Post
+    type: table,
+    entity: Post,
     permissions: ["admin", "editor"]
 }
 
 config {
-    db: postgresql
-    auth {
-        provider: jwt
+    db: postgresql,
+    auth: {
+        provider: jwt,
         userEntity: User
     }
 }

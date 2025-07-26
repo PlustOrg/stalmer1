@@ -22,9 +22,10 @@ describe('Virtual Fields', () => {
   it('should generate a resolver file and call the resolver function', async () => {
     const dsl = `
       entity User {
-        firstName: String
-        lastName: String
-        fullName: String @virtual(from: "user.resolvers.ts#getFullName")
+        id: UUID primaryKey,
+        firstName: String,
+        lastName: String,
+        fullName: String @virtual(from: "firstName + \" \" + lastName")
       }
     `;
     const app = parseDSL(dsl);

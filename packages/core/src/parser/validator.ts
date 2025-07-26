@@ -104,6 +104,15 @@ class Validator {
   
   private validateFieldDeclaration(field: AST.FieldDeclarationNode, entityName: string, fieldNames: Set<string>): void {
     const fieldName = field.name.name;
+
+    // Validate field name format
+    if (!fieldName.match(/^[a-zA-Z_][a-zA-Z0-9_]*$/)) {
+      this.reportError(
+        `Invalid field name: '${fieldName}'. Field names must start with a letter or underscore and contain only letters, numbers, and underscores.`,
+        field.name.position.start.line,
+        field.name.position.start.column
+      );
+    }
     
     // Check for duplicate field names
     if (fieldNames.has(fieldName)) {

@@ -5,11 +5,11 @@ config app {
 }
 
 config auth {
-  provider: jwt
-  userEntity: User
+  provider: jwt,
+  userEntity: User,
   props: {
-    clerkPublishableKey: "test-key"
-    auth0Domain: "test.auth0.com"
+    clerkPublishableKey: "test-key",
+    auth0Domain: "test.auth0.com",
     auth0ClientId: "test-client-id"
   }
 }
@@ -27,55 +27,55 @@ enum Role {
 }
 
 entity TestEntity {
-  id: UUID primaryKey
-  name: String
-  email: String unique
-  password: Password
+  id: UUID primaryKey,
+  name: String,
+  email: String unique,
+  password: Password,
   createdAt: DateTime
 }
 
 entity User {
-  id: UUID primaryKey
-  name: String
+  id: UUID primaryKey,
+  name: String,
   email: String unique
 }
 
 entity Post {
-  id: UUID primaryKey
-  title: String
+  id: UUID primaryKey,
+  title: String,
   content: Text
 }
 
 entity Product {
-  id: UUID primaryKey
-  name: String
+  id: UUID primaryKey,
+  name: String,
   price: Decimal
 }
 
 page TestPage {
-  type: table
-  route: "/test-page"
-  entity: TestEntity
+  type: table,
+  route: "/test-page",
+  entity: TestEntity,
   permissions: [ADMIN, USER]
 }
 
 page UserPage {
-  type: table
-  route: "/users"
-  entity: User
+  type: table,
+  route: "/users",
+  entity: User,
   permissions: [ADMIN]
 }
 
 page PostPage {
-  type: form
-  route: "/posts"
-  entity: Post
+  type: form,
+  route: "/posts",
+  entity: Post,
   permissions: [ADMIN, EDITOR]
 }
 
 page ProductPage {
-  type: details
-  route: "/products"
-  entity: Product
+  type: details,
+  route: "/products",
+  entity: Product,
   permissions: [ADMIN, USER]
 }

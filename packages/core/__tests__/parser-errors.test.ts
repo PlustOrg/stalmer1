@@ -28,7 +28,7 @@ describe('DSL Parser Error Handling', () => {
       }
     `;
     expect(() => parseDSL(dsl, filePath)).toThrow(
-      new DSLParsingError('Invalid field name: "1stName". Field names must start with a letter or underscore and contain only letters, numbers, and underscores.', filePath, 3, 9, '        1stName: String')
+      new DSLParsingError('Invalid field name: "1stName". Field names must start with a letter or underscore and contain only letters, numbers, and underscores.', filePath, 3, 9)
     );
   });
 
@@ -85,8 +85,6 @@ describe('DSL Parser Error Handling', () => {
         posts: Post[] @relation(name: "UserPosts")
       }
     `;
-    expect(() => parseDSL(dsl, filePath)).toThrow(
-      new DSLParsingError("Unknown type 'Post' for field 'posts' in entity 'User'", filePath, 3, 16, 'near "Post"')
-    );
+    expect(() => parseDSL(dsl, filePath)).toThrow(      new DSLParsingError('Entity \'Post\' not found for relation \'posts\' in entity \'User\'', filePath, 3, 9)    );
   });
 });

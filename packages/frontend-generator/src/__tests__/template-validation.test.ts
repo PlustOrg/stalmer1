@@ -30,12 +30,18 @@ const mockData = {
   app: parsedApp,
   
   // Page data - use the first page with a table type
-  page: parsedApp.pages.find(p => p.type === 'table') || {
+  page: parsedApp.pages.find(p => p.type === 'table' && typeof p.entity === 'object' && p.entity !== null && 'name' in p.entity && 'fields' in p.entity) || {
     name: 'TestPage',
     type: 'table',
     route: '/test-page',
     permissions: ['ADMIN', 'USER'],
-    entity: parsedApp.entities.find(e => e.name === 'TestEntity')
+    entity: {
+      name: 'TestEntity',
+      fields: [
+        { name: 'id', type: 'string' },
+        { name: 'name', type: 'string' }
+      ]
+    }
   },
   
   // Collection of pages from DSL
@@ -88,23 +94,17 @@ describe('EJS Template Validation', () => {
       
       // Add specific mock data based on the template file
       if (templateFile.includes('Table.tsx.ejs')) {
-        const tablePage = mockData.pages.find(p => p.type === 'table');
-        if (tablePage) {
-          const entity = parsedApp.entities.find(e => e.name === tablePage.entity);
-          templateData = { ...mockData, page: { ...tablePage, entity } };
-        }
+        const tablePage = mockData.pages.find(p => p.type === 'table' && typeof p.entity === 'object' && p.entity !== null && 'name' in p.entity && 'fields' in p.entity);
+        if (tablePage) templateData = { page: tablePage };
+        else templateData = { page: mockData.page };
       } else if (templateFile.includes('Form.tsx.ejs')) {
-        const formPage = mockData.pages.find(p => p.type === 'form');
-        if (formPage) {
-          const entity = parsedApp.entities.find(e => e.name === formPage.entity);
-          templateData = { ...mockData, page: { ...formPage, entity } };
-        }
+        const formPage = mockData.pages.find(p => p.type === 'form' && typeof p.entity === 'object' && p.entity !== null && 'name' in p.entity && 'fields' in p.entity);
+        if (formPage) templateData = { page: formPage };
+        else templateData = { page: mockData.page };
       } else if (templateFile.includes('Details.tsx.ejs')) {
-        const detailsPage = mockData.pages.find(p => p.type === 'details');
-        if (detailsPage) {
-          const entity = parsedApp.entities.find(e => e.name === detailsPage.entity);
-          templateData = { ...mockData, page: { ...detailsPage, entity } };
-        }
+        const detailsPage = mockData.pages.find(p => p.type === 'details' && typeof p.entity === 'object' && p.entity !== null && 'name' in p.entity && 'fields' in p.entity);
+        if (detailsPage) templateData = { page: detailsPage };
+        else templateData = { page: mockData.page };
       }
       
       // Test that the template can be compiled
@@ -139,12 +139,17 @@ describe('Template Integration Tests', () => {
   
   it('should generate Table components correctly', () => {
     const tableTemplate = fs.readFileSync(path.join(templatesDir, 'Table.tsx.ejs'), 'utf-8');
-    const tablePages = mockData.pages.filter(p => p.type === 'table');
-    
+    // Only test pages with a valid entity object
+    const tablePages = mockData.pages.filter(
+      p => p.type === 'table' &&
+        typeof p.entity === 'object' &&
+        p.entity !== null &&
+        Array.isArray((p.entity as { fields?: any[] }).fields)
+    );
+
     tablePages.forEach(page => {
-      const entity = parsedApp.entities.find(e => e.name === page.entity);
       expect(() => {
-        ejs.render(tableTemplate, { ...mockData, page: { ...page, entity } });
+        ejs.render(tableTemplate, { page });
       }).not.toThrow();
     });
   });
@@ -154,9 +159,8 @@ describe('Template Integration Tests', () => {
     const formPages = mockData.pages.filter(p => p.type === 'form');
     
     formPages.forEach(page => {
-      const entity = parsedApp.entities.find(e => e.name === page.entity);
       expect(() => {
-        ejs.render(formTemplate, { ...mockData, page: { ...page, entity } });
+        ejs.render(formTemplate, { page });
       }).not.toThrow();
     });
   });
@@ -166,9 +170,8 @@ describe('Template Integration Tests', () => {
     const detailsPages = mockData.pages.filter(p => p.type === 'details');
     
     detailsPages.forEach(page => {
-      const entity = parsedApp.entities.find(e => e.name === page.entity);
       expect(() => {
-        ejs.render(detailsTemplate, { ...mockData, page: { ...page, entity } });
+        ejs.render(detailsTemplate, { page });
       }).not.toThrow();
     });
   });

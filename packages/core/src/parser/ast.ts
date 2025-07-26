@@ -116,6 +116,7 @@ export type ValueNode =
   | NumberLiteralNode
   | BooleanLiteralNode
   | IdentifierNode
+  | ChainedIdentifierNode
   | ArrayLiteralNode
   | ObjectLiteralNode
   | FunctionCallNode;
@@ -138,6 +139,11 @@ export interface BooleanLiteralNode extends NodeBase {
 export interface IdentifierNode extends NodeBase {
   kind: 'Identifier';
   name: string;
+}
+
+export interface ChainedIdentifierNode extends NodeBase {
+  kind: 'ChainedIdentifier';
+  parts: (IdentifierNode | ChainedIdentifierNode)[];
 }
 
 export interface ArrayLiteralNode extends NodeBase {

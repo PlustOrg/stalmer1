@@ -26,7 +26,7 @@ export function parseDSL(dslText: string, filePath?: string): IApp {
     const tokens: Token[] = tokenize(dslText, filePath);
     
     // Step 2: Parse tokens into an AST
-    const ast: AST.SourceFileNode = parse(tokens, filePath, dslText);
+    const ast: AST.SourceFileNode = parse(tokens, filePath);
     
     // Step 3: Validate the AST
     const diagnostics: Diagnostic[] = validate(ast, filePath);
@@ -42,15 +42,6 @@ export function parseDSL(dslText: string, filePath?: string): IApp {
         firstDiagnostic.column,
         firstDiagnostic.context
       );
-      
-      // In the future, we could implement an AggregateError or custom error class
-      // that can hold multiple diagnostics
-      // throw new AggregateError(
-      //   diagnostics.map(d => new DSLParsingError(
-      //     d.message, d.filePath, d.line, d.column, d.context
-      //   )),
-      //   'DSL validation failed with multiple errors'
-      // );
     }
     
     // Step 4: Build the IR from the validated AST

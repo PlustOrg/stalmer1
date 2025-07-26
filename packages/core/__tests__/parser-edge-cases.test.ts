@@ -28,15 +28,15 @@ describe('DSL Parser - Edge Cases', () => {
   it('should handle various data types correctly', () => {
     const dsl = `
       entity DataTypes {
-        f_string: String
-        f_text: Text
-        f_int: Int
-        f_float: Float
-        f_decimal: Decimal
-        f_boolean: Boolean
-        f_datetime: DateTime
-        f_date: Date
-        f_uuid: UUID
+        f_string: String,
+        f_text: Text,
+        f_int: Int,
+        f_float: Float,
+        f_decimal: Decimal,
+        f_boolean: Boolean,
+        f_datetime: DateTime,
+        f_date: Date,
+        f_uuid: UUID,
         f_json: JSON
       }
     `;
@@ -55,11 +55,11 @@ describe('DSL Parser - Edge Cases', () => {
   it('should handle all field attributes', () => {
     const dsl = `
       entity Attributes {
-        id: UUID primaryKey
-        email: String unique
-        middleName: String optional
-        createdAt: DateTime readonly
-        age: Int validate(min: 18)
+        id: UUID primaryKey,
+        email: String unique,
+        middleName: String optional,
+        createdAt: DateTime readonly,
+        age: Int validate(min: 18),
         retries: Int default(0)
       }
     `;
@@ -81,9 +81,9 @@ describe('DSL Parser - Edge Cases', () => {
         entity: Dummy
         route: "/complex"
         props: {
-          setting1: "value1"
+          setting1: "value1",
           nested: {
-            setting2: true
+            setting2: true,
             deeplyNested: {
               setting3: [1, 2, 3]
             }
@@ -104,9 +104,9 @@ describe('DSL Parser - Edge Cases', () => {
     const dsl = `
       entity Dummy {}
       page ArrayPage {
-        type: table
-        entity: Dummy
-        route: "/array"
+        type: table,
+        entity: Dummy,
+        route: "/array",
         columns: [
           { field: name, label: "Name" },
           { field: value, label: "Value" }
@@ -135,9 +135,9 @@ describe('DSL Parser - Edge Cases', () => {
     const dsl = `
       entity Dummy {}
       page QuotedPage {
-        type: details
-        entity: Dummy
-        route: "/quoted"
+        type: details,
+        entity: Dummy,
+        route: "/quoted",
         title: "A Page with a Long Title"
       }
     `;
@@ -149,13 +149,13 @@ describe('DSL Parser - Edge Cases', () => {
   it('should handle a complex DSL with all features', () => {
     const dsl = `
       config auth {
-        provider: jwt
+        provider: jwt,
         userEntity: User
       }
 
       config integrations {
         email: {
-          provider: sendgrid
+          provider: sendgrid,
           apiKey: env(SENDGRID_API_KEY)
         }
       }
@@ -180,9 +180,9 @@ describe('DSL Parser - Edge Cases', () => {
       }
 
       page UserList {
-        type: table
-        entity: User
-        route: "/users"
+        type: table,
+        entity: User,
+        route: "/users",
         columns: [
           { field: email, label: "Email" },
           { field: role, label: "Role" }
@@ -191,14 +191,14 @@ describe('DSL Parser - Edge Cases', () => {
 
       workflow UserOnboarding {
         trigger: {
-          event: "user.created"
+          event: "user.created",
           entity: User
-        }
+        },
         steps: [
           {
-            action: sendEmail
+            action: sendEmail,
             inputs: {
-              template: "welcome"
+              template: "welcome",
               recipient: trigger.entity.email
             }
           }

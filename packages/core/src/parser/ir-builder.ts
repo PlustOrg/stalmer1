@@ -30,6 +30,7 @@ class IRBuilder {
       entities: [],
       views: [],
       pages: [],
+      workflows: [],
       config: {}
     };
     
@@ -46,11 +47,21 @@ class IRBuilder {
         if (!this.app.config) this.app.config = {};
         this.processConfig(statement);
       } else if (statement.kind === 'EnumDeclaration') {
-        // Handle enums if needed - currently not in IR
+        if (!this.app.config) this.app.config = {};
+        if (!this.app.config.enums) this.app.config.enums = {};
+        const enumDef = this.buildEnum(statement);
+        this.app.config.enums[enumDef.name] = enumDef.values;
       }
     }
     
     return this.app;
+  }
+
+  private buildEnum(node: AST.EnumDeclarationNode): { name: string; values: string[] } {
+    return {
+      name: node.name.name,
+      values: node.values.map(val => val.name.name),
+    };
   }
 
   buildEntity(node: AST.EntityDeclarationNode): IREntity {
@@ -220,37 +231,12 @@ class IRBuilder {
       fields: []
     };
 
-    // Process properties
-    for (const property of node.properties) {
-      if (property.name === 'from' && property.value.kind === 'Identifier') {
-        view.from = property.value.name;
-      } else if (property.name === 'fields' && property.value.kind === 'ArrayLiteral') {
-        const fields = property.value.elements;
-        for (const field of fields) {
-          if (field.kind === 'StringLiteral') {
-            const viewField: IRViewField = {
-              name: field.value,
-              type: 'String', // Default type, could be improved with context
-              expression: field.value // For simple field references
-            };
-            view.fields.push(viewField);
-          } else if (field.kind === 'ObjectLiteral') {
-            // Handle object literals for field definitions
-            const name = field.properties['name']?.kind === 'StringLiteral' ? field.properties['name'].value : '';
-            const type = field.properties['type']?.kind === 'Identifier' ? field.properties['type'].name : 'String';
-            const expression = field.properties['expression']?.kind === 'StringLiteral' ? field.properties['expression'].value : '';
-            
-            if (name && expression) {
-              const viewField: IRViewField = {
-                name,
-                type,
-                expression
-              };
-              view.fields.push(viewField);
-            }
-          }
-        }
-      }
+    for (const fieldNode of node.fields) {
+      view.fields.push({
+        name: fieldNode.name.name,
+        type: fieldNode.type || 'String', // Default to String if type is not specified
+        expression: fieldNode.expression,
+      });
     }
 
     return view;
@@ -308,13 +294,19 @@ class IRBuilder {
 
   // Process config declaration
   private processConfig(node: AST.ConfigDeclarationNode): void {
-    for (const property of node.properties) {
-      if (property.value.kind === 'StringLiteral') {
-        if (!this.app.config) this.app.config = {};
-        this.app.config[property.name] = property.value.value;
-      } else if (property.value.kind === 'ObjectLiteral') {
-        if (!this.app.config) this.app.config = {};
-        this.app.config[property.name] = this.convertObjectLiteralToPlainObject(property.value);
+    if (!this.app.config) this.app.config = {};
+
+    if (node.name.name === 'auth') {
+      this.app.config.auth = this.convertObjectLiteralToPlainObject(node.properties[0].value as AST.ObjectLiteralNode) as IRConfig['auth'];
+    } else if (node.name.name === 'integrations') {
+      this.app.config.integrations = this.convertObjectLiteralToPlainObject(node.properties[0].value as AST.ObjectLiteralNode) as IRConfig['integrations'];
+    } else {
+      for (const property of node.properties) {
+        if (property.value.kind === 'StringLiteral') {
+          this.app.config[property.name] = property.value.value;
+        } else if (property.value.kind === 'ObjectLiteral') {
+          this.app.config[property.name] = this.convertObjectLiteralToPlainObject(property.value);
+        }
       }
     }
   }
@@ -393,3 +385,4 @@ class IRBuilder {
     return result;
   }
 }
+
